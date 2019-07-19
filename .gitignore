@@ -1,0 +1,7 @@
+*~
+*.swp
+tags
+.DS_Store
+.#*
+dist/
+.cask/
