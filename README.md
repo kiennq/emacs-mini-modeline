@@ -3,6 +3,51 @@ mini-modeline
 
 Allows to display mode line information in minibuffer.
 
+![mini-modeline in action](screenshots/mini-modeline.gif)
+
+# Install
+## Using [`Quelpa`](https://framagit.org/steckerhalter/quelpa)
+
+Example:
+
+``` elisp
+;; I'm activating mini-modeline after smart-mode-line
+(use-package mini-modeline
+  :quelpa (mini-modeline :repo "kiennq/emacs-mini-modeline" :fetcher github)
+  :after smart-mode-line
+  :config
+  (mini-modeline-mode t))
+```
+
+Although I would recommend my `Quelpa` [fork](https://github.com/kiennq/quelpa) since it allows to shallow clone git repo and can run on Windows 10 with buit-in `tar`.
+
+## Manually
+Just clone this repo and put it in your `load-path`.
+
+# Usage
+`mini-modeline` comes with a global minor-mode `mini-modeline-mode`.
+You can toggle it by `M-x mini-modeline-mode`.
+
+## Important variables
+You can customize those variable for better experiences.
+
+1. `mini-modeline-format`
+    Analogous to `mode-line-format`, but controls the minibuffer line.
+
+2. `mini-modeline-color`
+   Background of mini-modeline. Will be set if `mini-modeline-enhance-visual` is t.
+
+3. `mini-modeline-enhance-visual`
+   Enhance minibuffer and window's visibility. This will enable `window-divider-mode` since without the mode line, two continuous windows are nearly indistinguishable.
+
+4. `mini-modeline-echo-duration`
+   Duration to keep display echo. `mini-modeline` will display the message which has been echoed to echo area as part of mode line. Those echo will be automatically clear after this interval.
+   Check out the gif to see it in action.
+
+5. `mini-modeline-update-interval`
+    The minimum interval to update `mini-modeline`.
+   If you found `mini-modeline` is being updated to frequently, you can customize this variable.
+
 # Why?
 
 Echo area or `minibuffer` which reside in it is a big waste most of the time.
