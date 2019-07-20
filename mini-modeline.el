@@ -127,9 +127,11 @@ When ARG is:
             (with-current-buffer mini-modeline--minibuffer
               (buffer-disable-undo)
               (let ((truncate-lines mini-modeline-truncate-p)
-                    (msg (or mini-modeline--msg-message (current-message))))
+                    (msg (current-message)))
                 ;; Clear ech area an start new timer for echo message
                 (when msg
+                  ;; (mini-modeline--debug "msg: %s\n" msg)
+                  ;; (mini-modeline--debug "from: %s\n" mini-modeline--msg-message)
                   (message nil)
                   (setq mini-modeline--last-echoed (current-time))
                   (setq mini-modeline--msg msg))
@@ -147,13 +149,6 @@ When ARG is:
 (defun mini-modeline--msg ()
   "Place holder to display echo area message."
   mini-modeline--msg)
-
-(defun mini-modeline--reroute-msg (fun &rest args)
-  "Reroute message to `mini-modeline'."
-  (unless inhibit-message
-    (let* ((inhibit-message t)
-           (mini-modeline--msg-message (apply fun args)))
-      (mini-modeline-display 'force))))
 
 (defun mini-modeline--window-divider (&optional reset)
   "Setup `window-divider-mode' or RESET it."
@@ -190,7 +185,6 @@ BODY will be supplied with orig-func and args."
   (redisplay)
   ;; (add-hook 'post-command-hook #'mini-modeline-display)
   (add-hook 'pre-redisplay-functions #'mini-modeline-display)
-  (advice-add #'message :around #'mini-modeline--reroute-msg)
   (when mini-modeline-enhance-visual
     (add-hook 'minibuffer-setup-hook #'mini-modeline--set-buffer-background)
     ;; set up `window-divider-mode' for visibility
@@ -221,7 +215,6 @@ BODY will be supplied with orig-func and args."
   (redisplay)
   ;; (remove-hook 'post-command-hook #'mini-modeline-display)
   (remove-hook 'pre-redisplay-functions #'mini-modeline-display)
-  (advice-remove #'message #'mini-modeline--reroute-msg)
   (mini-modeline-display 'clear)
   (when mini-modeline-enhance-visual
     (remove-hook 'minibuffer-setup-hook #'mini-modeline--set-buffer-background)
