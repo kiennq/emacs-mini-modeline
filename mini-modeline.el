@@ -42,19 +42,30 @@
 (unless (boundp 'evil-mode-line-tag)
   (defvar-local evil-mode-line-tag nil))
 
-(defcustom mini-modeline-format '("%e" mode-line-front-space
-                                  mode-line-mule-info
-                                  mode-line-client
-                                  mode-line-modified
-                                  mode-line-remote
-                                  mode-line-frame-identification
-                                  mode-line-buffer-identification
-                                  " "
-                                  (mini-modeline--msg
-                                   (:eval (mini-modeline--msg))
-                                   ("" mode-line-position evil-mode-line-tag
-                                    mode-line-modes mode-line-misc-info))
-                                  mode-line-end-spaces)
+(defcustom l-mini-modeline-format '(:eval (mini-modeline-msg))
+  "Left part of mini-modeline, same format with `mode-line-format'."
+  :type `(repeat symbol)
+  :group 'mini-modeline)
+
+(defcustom r-mini-modeline-format '("%e" mode-line-front-space
+                                        mode-line-mule-info
+                                        mode-line-client
+                                        mode-line-modified
+                                        mode-line-remote
+                                        mode-line-frame-identification
+                                        mode-line-buffer-identification
+                                        " " mode-line-position " "
+                                        evil-mode-line-tag
+                                        mode-line-modes mode-line-misc-info
+                                        mode-line-end-spaces)
+  "Right part of mini-modeline, same format with `mode-line-format'."
+  :type `(repeat symbol)
+  :group 'mini-modeline)
+
+(defcustom mini-modeline-format
+  '((:eval (mini-modeline-lr-render
+            (string-trim (format-mode-line l-mini-modeline-format))
+            (string-trim (format-mode-line r-mini-modeline-format)))))
   "Analogous to `mode-line-format', but controls the minibuffer line."
   :type `(repeat symbol)
   :group 'mini-modeline)
@@ -115,7 +126,7 @@ Will be set if `mini-modeline-enhance-visual' is t."
   "Update mini-modeline.
 When ARG is:
 - `force', force update the minibuffer.
-- `clear', clear the minibuffer. This implies `force'."
+- `clear', clear the minibuffer.  This implies `force'."
   (ignore-errors
     (when (or (memq arg '(force clear))
               (>= (float-time (time-since mini-modeline--last-update))
@@ -127,8 +138,8 @@ When ARG is:
             (with-current-buffer mini-modeline--minibuffer
               (buffer-disable-undo)
               (let ((truncate-lines mini-modeline-truncate-p)
-                    (msg (current-message)))
-                ;; Clear ech area an start new timer for echo message
+                    (msg (or mini-modeline--msg-message (current-message))))
+                ;; Clear echo area and start new timer for echo message
                 (when msg
                   ;; (mini-modeline--debug "msg: %s\n" msg)
                   ;; (mini-modeline--debug "from: %s\n" mini-modeline--msg-message)
@@ -143,21 +154,31 @@ When ARG is:
                 ;; Showing mini-modeline
                 (erase-buffer)
                 (unless (eq arg 'clear)
-                  (insert (string-trim (format-mode-line mini-modeline-format))))
+                  (insert (format-mode-line mini-modeline-format)))
                 (goto-char (point-max))))))))))
 
-(defun mini-modeline--msg ()
+(defun mini-modeline-msg ()
   "Place holder to display echo area message."
   mini-modeline--msg)
 
+(defun mini-modeline-lr-render (left right)
+  "Render the LEFT and RIGHT part of mini-modeline."
+  (let* ((available-width (- (frame-width) (length left) 3)))
+    (format (format "%%s %%%ds " available-width) left right)))
+
+(defun mini-modeline--reroute-msg (func &rest args)
+  "Reroute FUNC with ARGS that echo to echo area to place hodler."
+  (unless inhibit-message
+    (let ((inhibit-message t))
+      (setq mini-modeline--msg-message (apply func args)))))
+
 (defun mini-modeline--window-divider (&optional reset)
-  "Setup `window-divider-mode' or RESET it."
+  "Setup command `window-divider-mode' or RESET it."
   (if reset
       (window-divider-mode -1)
     (setq window-divider-default-places t
           window-divider-default-bottom-width 1
-          window-divider-default-right-width 1)
-    (window-divider-mode 1)))
+          window-divider-default-right-width (window-divider-mode 1))))
 
 (defmacro mini-modeline--wrap (func &rest body)
   "Add an advice around FUNC with name mini-modeline--%s.
@@ -189,20 +210,21 @@ BODY will be supplied with orig-func and args."
     (add-hook 'minibuffer-setup-hook #'mini-modeline--set-buffer-background)
     ;; set up `window-divider-mode' for visibility
     (mini-modeline--window-divider))
+  (advice-add #'message :around #'mini-modeline--reroute-msg)
 
   ;; compatibility
   (eval-after-load 'anzu
     (progn
       (mini-modeline--wrap
        anzu--cons-mode-line
-       (let ((mode-line-format mini-modeline-format))
+       (let ((mode-line-format r-mini-modeline-format))
          (apply orig-func args)
-         (setq mini-modeline-format mode-line-format)))
+         (setq r-mini-modeline-format mode-line-format)))
       (mini-modeline--wrap
        anzu--reset-mode-line
-       (let ((mode-line-format mini-modeline-format))
+       (let ((mode-line-format r-mini-modeline-format))
          (apply orig-func args)
-         (setq mini-modeline-format mode-line-format))))))
+         (setq r-mini-modeline-format mode-line-format))))))
 
 ;;;###autoload
 (defun mini-modeline-disable ()
@@ -219,6 +241,7 @@ BODY will be supplied with orig-func and args."
   (when mini-modeline-enhance-visual
     (remove-hook 'minibuffer-setup-hook #'mini-modeline--set-buffer-background)
     (mini-modeline--window-divider 'reset))
+  (advice-remove #'message #'mini-modeline--reroute-msg)
 
   ;; compatibility
   (eval-after-load 'anzu
