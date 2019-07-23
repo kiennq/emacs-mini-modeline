@@ -86,8 +86,6 @@ Will be set if `mini-modeline-enhance-visual' is t."
   :type 'boolean
   :group 'mini-modeline)
 
-(defvar mini-modeline--minibuffer " *Minibuf-0*")
-
 (defvar mini-modeline--orig-mode-line mode-line-format)
 
 (defcustom mini-modeline-echo-duration 2
@@ -135,7 +133,7 @@ When ARG is:
       (cl-letf (((symbol-function 'completion-all-completions) #'ignore))
         (while-no-input
           (unless (active-minibuffer-window)
-            (with-current-buffer mini-modeline--minibuffer
+            (with-current-buffer (window-buffer (minibuffer-window))
               (buffer-disable-undo)
               (let ((truncate-lines mini-modeline-truncate-p)
                     (msg (or mini-modeline--msg-message (current-message))))
