@@ -39,8 +39,7 @@
   :prefix "mini-modeline-")
 
 ;; Forward declaration for evil-mode-line-tag
-(unless (boundp 'evil-mode-line-tag)
-  (defvar-local evil-mode-line-tag nil))
+(defvar evil-mode-line-tag)
 
 (defcustom l-mini-modeline-format '(:eval (mini-modeline-msg))
   "Left part of mini-modeline, same format with `mode-line-format'."
