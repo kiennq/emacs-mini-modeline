@@ -28,23 +28,36 @@ Just clone this repo and put it in your `load-path`.
 `mini-modeline` comes with a global minor-mode `mini-modeline-mode`.
 You can toggle it by `M-x mini-modeline-mode`.
 
+## Features
+1. Display mode line in minibuffer.
+By default you can set anything that compatible with `mode-line-format`, even your current mode line and it will be nicely kept in minibuffer.
+
+2. Support left/right align display.
+You can set left side and right side part of `mini-modeline` separately.
+Just assign a `mode-line-format` compatible list to either `mini-modeline-l-format` or `mini-modeline-r-format`, and it will be left/right aligned accordingly.
+
+3. Support multiple lines display in `minibuffer`
+
 ## Important variables
 You can customize those variable for better experiences.
 
-1. `mini-modeline-format`
-    Analogous to `mode-line-format`, but controls the minibuffer line.
+1. `mini-modeline-l-format`
+   Left part of mini-modeline, same format with `mode-line-format`.
 
-2. `mini-modeline-color`
+2. `mini-modeline-r-format`
+   Right part of mini-modeline, same format with `mode-line-format`.
+
+3. `mini-modeline-color`
    Background of mini-modeline. Will be set if `mini-modeline-enhance-visual` is t.
 
-3. `mini-modeline-enhance-visual`
+4. `mini-modeline-enhance-visual`
    Enhance minibuffer and window's visibility. This will enable `window-divider-mode` since without the mode line, two continuous windows are nearly indistinguishable.
 
-4. `mini-modeline-echo-duration`
+5. `mini-modeline-echo-duration`
    Duration to keep display echo. `mini-modeline` will display the message which has been echoed to echo area as part of mode line. Those echo will be automatically clear after this interval.
    Check out the gif to see it in action.
 
-5. `mini-modeline-update-interval`
+6. `mini-modeline-update-interval`
     The minimum interval to update `mini-modeline`.
    If you found `mini-modeline` is being updated to frequently, you can customize this variable.
 

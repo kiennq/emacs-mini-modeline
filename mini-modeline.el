@@ -3,6 +3,7 @@
 ;; Copyright (C) 2019
 
 ;; Author:  Kien Nguyen <kien.n.quang@gmail.com>
+;; URL: https://github.com/kiennq/emacs-mini-modeline
 ;; Version: 0.1
 ;; Keywords: convenience, tools
 ;; Package-Requires: ((emacs "25.1") (dash "2.14.1"))
@@ -31,7 +32,7 @@
 (require 'dash)
 (require 'frame)
 (require 'subr-x)
-(require 'cl-macs)
+(require 'cl-lib)
 
 (defgroup mini-modeline nil
   "Customizations for `mini-modeline'."
@@ -41,12 +42,12 @@
 ;; Forward declaration for evil-mode-line-tag
 (defvar evil-mode-line-tag)
 
-(defcustom l-mini-modeline-format '(:eval (mini-modeline-msg))
+(defcustom mini-modeline-l-format '(:eval (mini-modeline-msg))
   "Left part of mini-modeline, same format with `mode-line-format'."
   :type `(repeat symbol)
   :group 'mini-modeline)
 
-(defcustom r-mini-modeline-format '("%e" mode-line-front-space
+(defcustom mini-modeline-r-format '("%e" mode-line-front-space
                                         mode-line-mule-info
                                         mode-line-client
                                         mode-line-modified
@@ -58,14 +59,6 @@
                                         mode-line-modes mode-line-misc-info
                                         mode-line-end-spaces)
   "Right part of mini-modeline, same format with `mode-line-format'."
-  :type `(repeat symbol)
-  :group 'mini-modeline)
-
-(defcustom mini-modeline-format
-  '((:eval (mini-modeline-lr-render
-            (string-trim (format-mode-line l-mini-modeline-format))
-            (string-trim (format-mode-line r-mini-modeline-format)))))
-  "Analogous to `mode-line-format', but controls the minibuffer line."
   :type `(repeat symbol)
   :group 'mini-modeline)
 
@@ -145,23 +138,44 @@ When ARG is:
                   (setq mini-modeline--msg msg))
                 ;; Reset echo message when timeout
                 (when (and mini-modeline--msg
+                           (not cursor-in-echo-area)
                            (>= (float-time (time-since mini-modeline--last-echoed))
                                mini-modeline-echo-duration))
                   (setq mini-modeline--msg nil))
                 ;; Showing mini-modeline
                 (erase-buffer)
                 (unless (eq arg 'clear)
-                  (insert (format-mode-line mini-modeline-format)))
-                (goto-char (point-max))))))))))
+                  (let ((modeline
+                         (mini-modeline--multi-lr-render
+                          (string-trim (format-mode-line mini-modeline-l-format))
+                          (string-trim (format-mode-line mini-modeline-r-format)))))
+                    (insert (car modeline))
+                    (if (> (cdr modeline) 1)
+                        (window-resize (minibuffer-window)
+                                       (- (cdr modeline) (window-height (minibuffer-window)))))))))))))
+    ))
 
 (defun mini-modeline-msg ()
   "Place holder to display echo area message."
   mini-modeline--msg)
 
-(defun mini-modeline-lr-render (left right)
+(defsubst mini-modeline-lr-render (left right)
   "Render the LEFT and RIGHT part of mini-modeline."
   (let* ((available-width (- (frame-width) (length left) 3)))
-    (format (format "%%s %%%ds " available-width) left right)))
+    (format (format "%%s %%%ds " available-width)
+            (or left "")
+            (or right ""))))
+
+(defun mini-modeline--multi-lr-render (left right)
+  "Render the LEFT and RIGHT part of mini-modeline with multiline supported.
+Return value is (STRING . LINES)."
+  (let* ((l (split-string left "\n"))
+         (r (split-string right "\n"))
+         (lines (max (length l) (length r)))
+         re)
+    (--dotimes lines
+      (setq re (nconc re `(,(mini-modeline-lr-render (elt l it) (elt r it))))))
+    (cons (string-join re "\n") lines)))
 
 (defun mini-modeline--reroute-msg (func &rest args)
   "Reroute FUNC with ARGS that echo to echo area to place hodler."
@@ -202,6 +216,7 @@ BODY will be supplied with orig-func and args."
       (if (and (minibufferp) mini-modeline-enhance-visual)
           (mini-modeline--set-buffer-background))))
   (redisplay)
+  (setq resize-mini-windows t)
   ;; (add-hook 'post-command-hook #'mini-modeline-display)
   (add-hook 'pre-redisplay-functions #'mini-modeline-display)
   (when mini-modeline-enhance-visual
@@ -211,18 +226,16 @@ BODY will be supplied with orig-func and args."
   (advice-add #'message :around #'mini-modeline--reroute-msg)
 
   ;; compatibility
-  (eval-after-load 'anzu
-    (progn
-      (mini-modeline--wrap
-       anzu--cons-mode-line
-       (let ((mode-line-format r-mini-modeline-format))
-         (apply orig-func args)
-         (setq r-mini-modeline-format mode-line-format)))
-      (mini-modeline--wrap
-       anzu--reset-mode-line
-       (let ((mode-line-format r-mini-modeline-format))
-         (apply orig-func args)
-         (setq r-mini-modeline-format mode-line-format))))))
+  (mini-modeline--wrap
+   anzu--cons-mode-line
+   (let ((mode-line-format mini-modeline-r-format))
+     (apply orig-func args)
+     (setq mini-modeline-r-format mode-line-format)))
+  (mini-modeline--wrap
+   anzu--reset-mode-line
+   (let ((mode-line-format mini-modeline-r-format))
+     (apply orig-func args)
+     (setq mini-modeline-r-format mode-line-format))))
 
 ;;;###autoload
 (defun mini-modeline-disable ()
@@ -242,10 +255,8 @@ BODY will be supplied with orig-func and args."
   (advice-remove #'message #'mini-modeline--reroute-msg)
 
   ;; compatibility
-  (eval-after-load 'anzu
-    (progn
-      (advice-remove #'anzu--cons-mode-line 'mini-modeline--anzu--cons-mode-line)
-      (advice-remove #'anzu--reset-mode-line 'mini-modeline--anzu--reset-mode-line))))
+  (advice-remove #'anzu--cons-mode-line 'mini-modeline--anzu--cons-mode-line)
+  (advice-remove #'anzu--reset-mode-line 'mini-modeline--anzu--reset-mode-line))
 
 ;;;###autoload
 (define-minor-mode mini-modeline-mode
