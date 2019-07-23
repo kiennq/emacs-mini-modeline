@@ -178,7 +178,8 @@ When ARG is:
       (window-divider-mode -1)
     (setq window-divider-default-places t
           window-divider-default-bottom-width 1
-          window-divider-default-right-width (window-divider-mode 1))))
+          window-divider-default-right-width 1)
+    (window-divider-mode 1)))
 
 (defmacro mini-modeline--wrap (func &rest body)
   "Add an advice around FUNC with name mini-modeline--%s.
