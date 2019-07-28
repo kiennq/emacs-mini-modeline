@@ -128,7 +128,8 @@ When ARG is:
             (with-current-buffer (window-buffer (minibuffer-window))
               (buffer-disable-undo)
               (let ((truncate-lines mini-modeline-truncate-p)
-                    (msg (or mini-modeline--msg-message (current-message))))
+                    (msg (or mini-modeline--msg-message (current-message)))
+                    (inhibit-read-only t))
                 ;; Clear echo area and start new timer for echo message
                 (when msg
                   ;; (mini-modeline--debug "msg: %s\n" msg)
