@@ -98,8 +98,10 @@ Will be set if `mini-modeline-enhance-visual' is t."
   :group 'mini-modeline)
 
 (defvar mini-modeline--last-update (current-time))
+(defvar mini-modeline--cache nil)
 
 (defun mini-modeline--set-buffer-background ()
+  "Set buffer background for current buffer."
   (make-local-variable 'face-remapping-alist)
   (add-to-list 'face-remapping-alist
                `(default (:background ,mini-modeline-color))))
@@ -118,42 +120,46 @@ When ARG is:
 - `force', force update the minibuffer.
 - `clear', clear the minibuffer.  This implies `force'."
   (ignore-errors
-    (when (or (memq arg '(force clear))
-              (>= (float-time (time-since mini-modeline--last-update))
-                  mini-modeline-update-interval))
-      (setq mini-modeline--last-update (current-time))
       (cl-letf (((symbol-function 'completion-all-completions) #'ignore))
         (while-no-input
           (unless (active-minibuffer-window)
             (with-current-buffer (window-buffer (minibuffer-window))
               (buffer-disable-undo)
               (let ((truncate-lines mini-modeline-truncate-p)
-                    (msg (or mini-modeline--msg-message (current-message)))
                     (inhibit-read-only t))
-                ;; Clear echo area and start new timer for echo message
-                (when msg
-                  ;; (mini-modeline--debug "msg: %s\n" msg)
-                  ;; (mini-modeline--debug "from: %s\n" mini-modeline--msg-message)
-                  (message nil)
-                  (setq mini-modeline--last-echoed (current-time))
-                  (setq mini-modeline--msg msg))
-                ;; Reset echo message when timeout
-                (when (and mini-modeline--msg
-                           (not cursor-in-echo-area)
-                           (>= (float-time (time-since mini-modeline--last-echoed))
-                               mini-modeline-echo-duration))
-                  (setq mini-modeline--msg nil))
-                ;; Showing mini-modeline
+                (when (or (memq arg '(force clear))
+                          (>= (float-time (time-since mini-modeline--last-update))
+                              mini-modeline-update-interval))
+                  ;; Clear echo area and start new timer for echo message
+                  (let ((msg (or mini-modeline--msg-message (current-message))))
+                    (when msg
+                      ;; (mini-modeline--debug "msg: %s\n" msg)
+                      ;; (mini-modeline--debug "from: %s\n" mini-modeline--msg-message)
+                      (message nil)
+                      (setq mini-modeline--last-echoed (current-time))
+                      (setq mini-modeline--msg msg)))
+                  ;; Reset echo message when timeout
+                  (when (and mini-modeline--msg
+                             (not cursor-in-echo-area)
+                             (>= (float-time (time-since mini-modeline--last-echoed))
+                                 mini-modeline-echo-duration))
+                    (setq mini-modeline--msg nil))
+                  ;; Showing mini-modeline
+                  (if (eq arg 'clear)
+                      (setq mini-modeline--cache nil)
+                    (setq mini-modeline--cache
+                          (mini-modeline--multi-lr-render
+                           (string-trim (format-mode-line mini-modeline-l-format))
+                           (string-trim (format-mode-line mini-modeline-r-format))))
+                    (setq mini-modeline--last-update (current-time))))
+
+                ;; write to minibuffer
                 (erase-buffer)
-                (unless (eq arg 'clear)
-                  (let ((modeline
-                         (mini-modeline--multi-lr-render
-                          (string-trim (format-mode-line mini-modeline-l-format))
-                          (string-trim (format-mode-line mini-modeline-r-format)))))
-                    (insert (car modeline))
-                    (if (> (cdr modeline) 1)
-                        (window-resize (minibuffer-window)
-                                       (- (cdr modeline) (window-height (minibuffer-window)))))))))))))
+                (when mini-modeline--cache
+                  (insert (car mini-modeline--cache))
+                  (if (> (cdr mini-modeline--cache) 1)
+                      (window-resize (minibuffer-window)
+                                     (- (cdr mini-modeline--cache) (window-height (minibuffer-window)))))))))))
     ))
 
 (defun mini-modeline-msg ()
