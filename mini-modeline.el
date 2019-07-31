@@ -79,6 +79,8 @@ Will be set if `mini-modeline-enhance-visual' is t."
   :group 'mini-modeline)
 
 (defvar mini-modeline--orig-mode-line mode-line-format)
+(defvar mini-modeline--echo-keystrokes echo-keystrokes)
+
 
 (defcustom mini-modeline-echo-duration 2
   "Duration to keep display echo."
@@ -99,6 +101,8 @@ Will be set if `mini-modeline-enhance-visual' is t."
 
 (defvar mini-modeline--last-update (current-time))
 (defvar mini-modeline--cache nil)
+(defvar mini-modeline--command-state 'begin
+  "The state of current executed command 'begin -> 'exec -> 'end.")
 
 (defun mini-modeline--set-buffer-background ()
   "Set buffer background for current buffer."
@@ -130,17 +134,24 @@ When ARG is:
                 (when (or (memq arg '(force clear))
                           (>= (float-time (time-since mini-modeline--last-update))
                               mini-modeline-update-interval))
-                  ;; Clear echo area and start new timer for echo message
                   (let ((msg (or mini-modeline--msg-message (current-message))))
                     (when msg
+                      ;; Clear echo area and start new timer for echo message
                       ;; (mini-modeline--debug "msg: %s\n" msg)
                       ;; (mini-modeline--debug "from: %s\n" mini-modeline--msg-message)
                       (message nil)
                       (setq mini-modeline--last-echoed (current-time))
+                      ;; we proritize the message from `message'
+                      ;; or the message when we're not in middle of a command running.
+                      (when (or mini-modeline--msg-message
+                                (eq mini-modeline--command-state 'begin))
+                        (setq mini-modeline--command-state 'exec)
+                        ;; Don't echo keystrokes when in middle of command
+                        (setq echo-keystrokes 0))
                       (setq mini-modeline--msg msg)))
-                  ;; Reset echo message when timeout
+                  ;; Reset echo message when timeout and not in middle of command
                   (when (and mini-modeline--msg
-                             (not cursor-in-echo-area)
+                             (not (eq mini-modeline--command-state 'exec))
                              (>= (float-time (time-since mini-modeline--last-echoed))
                                  mini-modeline-echo-duration))
                     (setq mini-modeline--msg nil))
@@ -187,8 +198,9 @@ Return value is (STRING . LINES)."
 (defun mini-modeline--reroute-msg (func &rest args)
   "Reroute FUNC with ARGS that echo to echo area to place hodler."
   (unless inhibit-message
-    (let ((inhibit-message t))
-      (setq mini-modeline--msg-message (apply func args)))))
+    (let* ((inhibit-message t)
+           (mini-modeline--msg-message (apply func args)))
+      (mini-modeline-display 'force))))
 
 (defun mini-modeline--window-divider (&optional reset)
   "Setup command `window-divider-mode' or RESET it."
@@ -208,6 +220,13 @@ BODY will be supplied with orig-func and args."
                    ,@body)
                  '((name . ,name)))))
 
+(defsubst mini-modeline--pre-cmd ()
+  (setq mini-modeline--command-state 'begin))
+
+(defsubst mini-modeline--post-cmd ()
+  (setq mini-modeline--command-state 'end
+        echo-keystrokes mini-modeline--echo-keystrokes))
+
 (declare-function anzu--cons-mode-line "anzu")
 (declare-function anzu--reset-mode-line "anzu")
 
@@ -224,13 +243,14 @@ BODY will be supplied with orig-func and args."
           (mini-modeline--set-buffer-background))))
   (redisplay)
   (setq resize-mini-windows t)
-  ;; (add-hook 'post-command-hook #'mini-modeline-display)
   (add-hook 'pre-redisplay-functions #'mini-modeline-display)
   (when mini-modeline-enhance-visual
     (add-hook 'minibuffer-setup-hook #'mini-modeline--set-buffer-background)
     ;; set up `window-divider-mode' for visibility
     (mini-modeline--window-divider))
   (advice-add #'message :around #'mini-modeline--reroute-msg)
+  (add-hook 'pre-command-hook #'mini-modeline--pre-cmd)
+  (add-hook 'post-command-hook #'mini-modeline--post-cmd)
 
   ;; compatibility
   (mini-modeline--wrap
@@ -260,6 +280,8 @@ BODY will be supplied with orig-func and args."
     (remove-hook 'minibuffer-setup-hook #'mini-modeline--set-buffer-background)
     (mini-modeline--window-divider 'reset))
   (advice-remove #'message #'mini-modeline--reroute-msg)
+  (remove-hook 'pre-command-hook #'mini-modeline--pre-cmd)
+  (remove-hook 'post-command-hook #'mini-modeline--post-cmd)
 
   ;; compatibility
   (advice-remove #'anzu--cons-mode-line 'mini-modeline--anzu--cons-mode-line)
