@@ -106,9 +106,10 @@ Will be set if `mini-modeline-enhance-visual' is t."
 
 (defun mini-modeline--set-buffer-background ()
   "Set buffer background for current buffer."
-  (make-local-variable 'face-remapping-alist)
-  (add-to-list 'face-remapping-alist
-               `(default (:background ,mini-modeline-color))))
+  (when mini-modeline-color
+    (make-local-variable 'face-remapping-alist)
+    (add-to-list 'face-remapping-alist
+                 `(default (:background ,mini-modeline-color)))))
 
 (defun mini-modeline--debug (&rest args)
   (save-excursion
@@ -125,8 +126,8 @@ When ARG is:
 - `clear', clear the minibuffer.  This implies `force'."
   (ignore-errors
       (cl-letf (((symbol-function 'completion-all-completions) #'ignore))
-        (while-no-input
-          (unless (active-minibuffer-window)
+        (unless (active-minibuffer-window)
+          (while-no-input
             (with-current-buffer (window-buffer (minibuffer-window))
               (buffer-disable-undo)
               (let ((truncate-lines mini-modeline-truncate-p)
