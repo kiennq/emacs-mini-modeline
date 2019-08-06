@@ -81,7 +81,6 @@ Will be set if `mini-modeline-enhance-visual' is t."
 (defvar mini-modeline--orig-mode-line mode-line-format)
 (defvar mini-modeline--echo-keystrokes echo-keystrokes)
 
-
 (defcustom mini-modeline-echo-duration 2
   "Duration to keep display echo."
   :type 'number
@@ -102,7 +101,7 @@ Will be set if `mini-modeline-enhance-visual' is t."
 (defvar mini-modeline--last-update (current-time))
 (defvar mini-modeline--cache nil)
 (defvar mini-modeline--command-state 'begin
-  "The state of current executed command 'begin -> 'exec -> 'end.")
+  "The state of current executed command begin -> [exec exec-read] -> end.")
 
 (defun mini-modeline--set-buffer-background ()
   "Set buffer background for current buffer."
@@ -254,6 +253,7 @@ BODY will be supplied with orig-func and args."
   (add-hook 'post-command-hook #'mini-modeline--post-cmd)
 
   ;; compatibility
+  ;; anzu
   (mini-modeline--wrap
    anzu--cons-mode-line
    (let ((mode-line-format mini-modeline-r-format))
@@ -263,7 +263,20 @@ BODY will be supplied with orig-func and args."
    anzu--reset-mode-line
    (let ((mode-line-format mini-modeline-r-format))
      (apply orig-func args)
-     (setq mini-modeline-r-format mode-line-format))))
+     (setq mini-modeline-r-format mode-line-format)))
+
+  ;; read-key-sequence
+  (mini-modeline--wrap
+   read-key-sequence
+   (progn
+     (setq mini-modeline--command-state 'exec-read)
+     (apply orig-func args)))
+  (mini-modeline--wrap
+   read-key-sequence-vector
+   (progn
+     (setq mini-modeline--command-state 'exec-read)
+     (apply orig-func args)))
+  )
 
 ;;;###autoload
 (defun mini-modeline-disable ()
@@ -286,7 +299,11 @@ BODY will be supplied with orig-func and args."
 
   ;; compatibility
   (advice-remove #'anzu--cons-mode-line 'mini-modeline--anzu--cons-mode-line)
-  (advice-remove #'anzu--reset-mode-line 'mini-modeline--anzu--reset-mode-line))
+  (advice-remove #'anzu--reset-mode-line 'mini-modeline--anzu--reset-mode-line)
+
+  (advice-remove #'read-key-sequence 'mini-modeline--read-key-sequence)
+  (advice-remove #'read-key-sequence-vector 'mini-modeline--read-key-sequence-vector)
+  )
 
 ;;;###autoload
 (define-minor-mode mini-modeline-mode
