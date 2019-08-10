@@ -31,8 +31,7 @@
 (require 'minibuffer)
 (require 'dash)
 (require 'frame)
-(require 'subr-x)
-(require 'cl-lib)
+(eval-when-compile (require 'subr-x))
 
 (defgroup mini-modeline nil
   "Customizations for `mini-modeline'."
@@ -110,7 +109,7 @@ Will be set if `mini-modeline-enhance-visual' is t."
     (add-to-list 'face-remapping-alist
                  `(default (:background ,mini-modeline-color)))))
 
-(defun mini-modeline--debug (&rest args)
+(defun mini-modeline--log (&rest args)
   (save-excursion
     (with-current-buffer "*Messages*"
       (read-only-mode -1)
@@ -123,7 +122,7 @@ Will be set if `mini-modeline-enhance-visual' is t."
 When ARG is:
 - `force', force update the minibuffer.
 - `clear', clear the minibuffer.  This implies `force'."
-  (ignore-errors
+  (condition-case err
       (cl-letf (((symbol-function 'completion-all-completions) #'ignore))
         (unless (active-minibuffer-window)
           (while-no-input
@@ -137,8 +136,8 @@ When ARG is:
                   (let ((msg (or mini-modeline--msg-message (current-message))))
                     (when msg
                       ;; Clear echo area and start new timer for echo message
-                      ;; (mini-modeline--debug "msg: %s\n" msg)
-                      ;; (mini-modeline--debug "from: %s\n" mini-modeline--msg-message)
+                      ;; (mini-modeline--log "msg: %s\n" msg)
+                      ;; (mini-modeline--log "from: %s\n" mini-modeline--msg-message)
                       (message nil)
                       (setq mini-modeline--last-echoed (current-time))
                       ;; we proritize the message from `message'
@@ -171,7 +170,8 @@ When ARG is:
                   (if (> (cdr mini-modeline--cache) 1)
                       (window-resize (minibuffer-window)
                                      (- (cdr mini-modeline--cache) (window-height (minibuffer-window)))))))))))
-    ))
+    ((error debug)
+     (mini-modeline--log "mini-modeline: %s\n" err))))
 
 (defun mini-modeline-msg ()
   "Place holder to display echo area message."
