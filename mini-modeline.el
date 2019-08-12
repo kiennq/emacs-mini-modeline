@@ -6,7 +6,7 @@
 ;; URL: https://github.com/kiennq/emacs-mini-modeline
 ;; Version: 0.1
 ;; Keywords: convenience, tools
-;; Package-Requires: ((emacs "25.1") (dash "2.14.1"))
+;; Package-Requires: ((emacs "25.1") (dash "2.12.0"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@
 (require 'dash)
 (require 'frame)
 (eval-when-compile (require 'subr-x))
-(eval-when-compile (require 'cl-macs))
+(eval-when-compile (require 'cl-lib))
 
 (defgroup mini-modeline nil
   "Customizations for `mini-modeline'."
@@ -48,16 +48,16 @@
   :group 'mini-modeline)
 
 (defcustom mini-modeline-r-format '("%e" mode-line-front-space
-                                        mode-line-mule-info
-                                        mode-line-client
-                                        mode-line-modified
-                                        mode-line-remote
-                                        mode-line-frame-identification
-                                        mode-line-buffer-identification
-                                        " " mode-line-position " "
-                                        evil-mode-line-tag
-                                        mode-line-modes mode-line-misc-info
-                                        mode-line-end-spaces)
+                                    mode-line-mule-info
+                                    mode-line-client
+                                    mode-line-modified
+                                    mode-line-remote
+                                    mode-line-frame-identification
+                                    mode-line-buffer-identification
+                                    " " mode-line-position " "
+                                    evil-mode-line-tag
+                                    mode-line-modes mode-line-misc-info
+                                    mode-line-end-spaces)
   "Right part of mini-modeline, same format with `mode-line-format'."
   :type `(repeat symbol)
   :group 'mini-modeline)
@@ -111,6 +111,7 @@ Will be set if `mini-modeline-enhance-visual' is t."
                  `(default (:background ,mini-modeline-color)))))
 
 (defun mini-modeline--log (&rest args)
+  "Log into message buffer with ARGS as same parameters in `message'."
   (save-excursion
     (with-current-buffer "*Messages*"
       (read-only-mode -1)
@@ -129,9 +130,10 @@ When ARG is:
           (cl-letf (((symbol-function 'completion-all-completions) #'ignore))
             (unless (active-minibuffer-window)
               (with-current-buffer (window-buffer (minibuffer-window))
-                (buffer-disable-undo)
                 (let ((truncate-lines mini-modeline-truncate-p)
-                      (inhibit-read-only t))
+                      (inhibit-read-only t)
+                      (inhibit-redisplay t))
+                  (buffer-disable-undo)
                   (when (or (memq arg '(force clear))
                             (>= (float-time (time-since mini-modeline--last-update))
                                 mini-modeline-update-interval))
@@ -163,7 +165,7 @@ When ARG is:
                             (mini-modeline--multi-lr-render
                              (string-trim (format-mode-line mini-modeline-l-format))
                              (string-trim (format-mode-line mini-modeline-r-format))))
-                      (setq mini-modeline--last-update (current-time))))
+                      (setq mini-modeline--last-update (current-time)))
 
                   ;; write to minibuffer
                   (erase-buffer)
@@ -172,7 +174,7 @@ When ARG is:
                     (if (> (cdr mini-modeline--cache) 1)
                         (window-resize (minibuffer-window)
                                        (- (cdr mini-modeline--cache)
-                                          (window-height (minibuffer-window)))))))))))
+                                          (window-height (minibuffer-window))))))))))))
       ((error debug)
        (mini-modeline--log "mini-modeline: %s\n" err)))))
 
@@ -224,9 +226,11 @@ BODY will be supplied with orig-func and args."
                  '((name . ,name)))))
 
 (defsubst mini-modeline--pre-cmd ()
+  "Pre command hook of mini-modeline."
   (setq mini-modeline--command-state 'begin))
 
 (defsubst mini-modeline--post-cmd ()
+  "Post command hook of mini-modeline."
   (setq mini-modeline--command-state 'end
         echo-keystrokes mini-modeline--echo-keystrokes))
 
