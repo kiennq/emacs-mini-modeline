@@ -114,10 +114,9 @@ Will be set if `mini-modeline-enhance-visual' is t."
   "Log into message buffer with ARGS as same parameters in `message'."
   (save-excursion
     (with-current-buffer "*Messages*"
-      (read-only-mode -1)
-      (goto-char (point-max))
-      (insert (apply #'format args))
-      (read-only-mode 1))))
+      (let ((inhibit-read-only t))
+        (goto-char (point-max))
+        (insert (apply #'format args))))))
 
 (defun mini-modeline-display (&optional arg)
   "Update mini-modeline.
@@ -219,7 +218,7 @@ Return value is (STRING . LINES)."
 (defmacro mini-modeline--wrap (func &rest body)
   "Add an advice around FUNC with name mini-modeline--%s.
 BODY will be supplied with orig-func and args."
-  (let* ((name (intern (format "mini-modeline--%s" (symbol-name func)))))
+  (let* ((name (intern (format "mini-modeline--%s" func))))
     `(advice-add #',func :around
                  (lambda (orig-func &rest args)
                    ,@body)
@@ -243,11 +242,13 @@ BODY will be supplied with orig-func and args."
   (interactive)
   ;; Hide all modeline
   (setq-default mode-line-format nil)
-  (--each (buffer-list)
-    (with-current-buffer it
-      (setq mode-line-format nil)
-      (if (and (minibufferp) mini-modeline-enhance-visual)
-          (mini-modeline--set-buffer-background))))
+  (mapc
+   (lambda (buf)
+     (with-current-buffer buf
+       (setq mode-line-format nil)
+       (if (and (minibufferp) mini-modeline-enhance-visual)
+           (mini-modeline--set-buffer-background))))
+   (buffer-list))
   (redisplay)
   (setq resize-mini-windows t)
   (add-hook 'pre-redisplay-functions #'mini-modeline-display)
@@ -290,9 +291,11 @@ BODY will be supplied with orig-func and args."
   "Disable `mini-modeline'."
   (interactive)
   (setq-default mode-line-format mini-modeline--orig-mode-line)
-  (--each (buffer-list)
-    (with-current-buffer it
-      (setq mode-line-format mini-modeline--orig-mode-line)))
+  (mapc
+   (lambda (buf)
+     (with-current-buffer buf
+       (setq mode-line-format mini-modeline--orig-mode-line)))
+   (buffer-list))
   (redisplay)
   ;; (remove-hook 'post-command-hook #'mini-modeline-display)
   (remove-hook 'pre-redisplay-functions #'mini-modeline-display)

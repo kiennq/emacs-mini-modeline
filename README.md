@@ -1,3 +1,6 @@
+[![MELPA](https://melpa.org/packages/mini-modeline-badge.svg)](https://melpa.org/#/mini-modeline)
+[![License: GPL v3](https://img.shields.io/badge/License-GPL%20v3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
 mini-modeline
 ============
 
@@ -6,6 +9,7 @@ Allows to display mode line information in minibuffer.
 ![mini-modeline in action](screenshots/mini-modeline.gif)
 
 # Install
+## Using melpa
 ## Using [`Quelpa`](https://framagit.org/steckerhalter/quelpa)
 
 Example:
