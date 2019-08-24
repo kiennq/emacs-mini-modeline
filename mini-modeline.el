@@ -246,10 +246,11 @@ BODY will be supplied with orig-func and args."
   (setq-default mode-line-format nil)
   (mapc
    (lambda (buf)
-     (with-current-buffer buf
-       (setq mode-line-format nil)
-       (if (and (minibufferp) mini-modeline-enhance-visual)
-           (mini-modeline--set-buffer-background))))
+     (unless (string-prefix-p " " (buffer-name buf))
+       (with-current-buffer buf
+         (setq mode-line-format nil)
+         (if (and (minibufferp) mini-modeline-enhance-visual)
+             (mini-modeline--set-buffer-background)))))
    (buffer-list))
   (redisplay)
   (setq resize-mini-windows t)
@@ -295,8 +296,9 @@ BODY will be supplied with orig-func and args."
   (setq-default mode-line-format mini-modeline--orig-mode-line)
   (mapc
    (lambda (buf)
-     (with-current-buffer buf
-       (setq mode-line-format mini-modeline--orig-mode-line)))
+     (unless (string-prefix-p " " (buffer-name buf))
+       (with-current-buffer buf
+         (setq mode-line-format mini-modeline--orig-mode-line))))
    (buffer-list))
   (redisplay)
   ;; (remove-hook 'post-command-hook #'mini-modeline-display)
