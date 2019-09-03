@@ -88,6 +88,12 @@ Will be set if `mini-modeline-enhance-visual' is t."
   :type 'number
   :group 'mini-modeline)
 
+(defcustom mini-modeline-frame nil
+  "Frame to display mini-modeline on.
+Nil means current selected frame."
+  :type 'sexp
+  :group 'mini-modeline)
+
 (defvar mini-modeline--last-echoed nil)
 
 (defvar mini-modeline--msg nil)
@@ -130,7 +136,7 @@ When ARG is:
         (cl-letf (((symbol-function 'completion-all-completions) #'ignore))
           (unless (or (active-minibuffer-window)
                       (input-pending-p))
-            (with-current-buffer (window-buffer (minibuffer-window))
+            (with-current-buffer (window-buffer (minibuffer-window mini-modeline-frame))
               (let ((truncate-lines mini-modeline-truncate-p)
                     (inhibit-read-only t)
                     (inhibit-redisplay t)
@@ -171,11 +177,11 @@ When ARG is:
                   ;; write to minibuffer
                   (erase-buffer)
                   (when mini-modeline--cache
-                    (insert (car mini-modeline--cache))
                     (if (> (cdr mini-modeline--cache) 1)
-                        (window-resize (minibuffer-window)
+                        (window-resize (minibuffer-window mini-modeline-frame)
                                        (- (cdr mini-modeline--cache)
-                                          (window-height (minibuffer-window)))))))))))
+                                          (window-height (minibuffer-window mini-modeline-frame)))))
+                    (insert (car mini-modeline--cache))))))))
       ((error debug)
        (mini-modeline--log "mini-modeline: %s\n" err)))))
 
@@ -183,23 +189,31 @@ When ARG is:
   "Place holder to display echo area message."
   mini-modeline--msg)
 
-(defsubst mini-modeline-lr-render (left right)
+(defsubst mini-modeline--lr-render (left right)
   "Render the LEFT and RIGHT part of mini-modeline."
-  (let* ((available-width (- (frame-width) (length left) 3)))
-    (format (format "%%s %%%ds " available-width)
-            (or left "")
-            (or right ""))))
+  (let* ((left (or left ""))
+         (right (or right ""))
+         (available-width (- (frame-width mini-modeline-frame) (string-width left) 3))
+         (required-width (string-width right)))
+    (if (< available-width required-width)
+        (cons
+         (format (format "%%%1$d.%1$ds\n%%s" (- (frame-width mini-modeline-frame) 3)) right left)
+         1)
+      (cons (format (format "%%s %%%ds" available-width) left right) 0))))
 
 (defun mini-modeline--multi-lr-render (left right)
   "Render the LEFT and RIGHT part of mini-modeline with multiline supported.
-Return value is (STRING . LINES)."
+ Return value is (STRING . LINES)."
   (let* ((l (split-string left "\n"))
          (r (split-string right "\n"))
          (lines (max (length l) (length r)))
+         (extra-lines 0)
          re)
     (--dotimes lines
-      (setq re (nconc re `(,(mini-modeline-lr-render (elt l it) (elt r it))))))
-    (cons (string-join re "\n") lines)))
+      (let ((lr (mini-modeline--lr-render (elt l it) (elt r it))))
+        (setq re (nconc re `(,(car lr))))
+        (setq extra-lines (+ extra-lines (cdr lr)))))
+    (cons (string-join re "\n") (+ lines extra-lines))))
 
 (defun mini-modeline--reroute-msg (func &rest args)
   "Reroute FUNC with ARGS that echo to echo area to place hodler."
