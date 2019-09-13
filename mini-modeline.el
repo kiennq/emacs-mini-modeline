@@ -70,7 +70,7 @@ Will be set if `mini-modeline-enhance-visual' is t."
   :type 'string
   :group 'mini-modeline)
 
-(defcustom mini-modeline-truncate-p nil
+(defcustom mini-modeline-truncate-p t
   "Truncates mini-modeline or not."
   :type 'boolean
   :group 'mini-modeline)
@@ -196,14 +196,18 @@ When ARG is:
          (available-width (- (frame-width mini-modeline-frame) (string-width left) 3))
          (required-width (string-width right)))
     (if (< available-width required-width)
-        (cons
-         (format (format "%%%1$d.%1$ds\n%%s" (- (frame-width mini-modeline-frame) 3)) right left)
-         1)
+        (if mini-modeline-truncate-p
+            (cons
+             (format (format "%%s %%%1$d.%1$ds" available-width) left right)
+             0)
+          (cons
+           (format (format "%%%1$d.%1$ds\n%%s" (- (frame-width mini-modeline-frame) 3)) right left)
+           1))
       (cons (format (format "%%s %%%ds" available-width) left right) 0))))
 
 (defun mini-modeline--multi-lr-render (left right)
   "Render the LEFT and RIGHT part of mini-modeline with multiline supported.
- Return value is (STRING . LINES)."
+Return value is (STRING . LINES)."
   (let* ((l (split-string left "\n"))
          (r (split-string right "\n"))
          (lines (max (length l) (length r)))

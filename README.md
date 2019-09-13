@@ -62,8 +62,14 @@ You can customize those variable for better experiences.
    Check out the gif to see it in action.
 
 6. `mini-modeline-update-interval`
-    The minimum interval to update `mini-modeline`.
+   The minimum interval to update `mini-modeline`.
    If you found `mini-modeline` is being updated to frequently, you can customize this variable.
+
+7. `mini-modeline-frame`
+   Frame to display mini-modeline on. `nil` means current selected frame.
+
+8. `mini-modeline-truncate-p`
+   Truncates the `mini-modeline` to fit in oneline.
 
 # Why?
 
