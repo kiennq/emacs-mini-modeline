@@ -107,6 +107,7 @@ Nil means current selected frame."
   :group 'mini-modeline)
 
 (defvar mini-modeline--last-update (current-time))
+(defvar mini-modeline--last-change-size (current-time))
 (defvar mini-modeline--cache nil)
 (defvar mini-modeline--command-state 'begin
   "The state of current executed command begin -> [exec exec-read] -> end.")
@@ -177,13 +178,26 @@ When ARG is:
                   ;; write to minibuffer
                   (erase-buffer)
                   (when mini-modeline--cache
-                    (if (> (cdr mini-modeline--cache) 1)
+                    (let ((height-increase (- (cdr mini-modeline--cache)
+                                              (window-height (minibuffer-window mini-modeline-frame))))
+                          ;; ; let mini-modeline take control of mini-buffer size
+                          (resize-mini-windows t))
+                      (when (or (> height-increase 0)
+                                ;; this is to prevent window flashing for consecutive multi-line message
+                                (>= (float-time (time-since mini-modeline--last-change-size))
+                                    mini-modeline-echo-duration))
                         (window-resize (minibuffer-window mini-modeline-frame)
-                                       (- (cdr mini-modeline--cache)
-                                          (window-height (minibuffer-window mini-modeline-frame)))))
+                                       height-increase)
+                        (setq mini-modeline--last-change-size (current-time))))
                     (insert (car mini-modeline--cache))))))))
       ((error debug)
        (mini-modeline--log "mini-modeline: %s\n" err)))))
+
+(defun mini-modeline--minibuffer-setup ()
+  (setq resize-mini-windows t))
+
+(defun mini-modeline--minibuffer-exit ()
+  (setq resize-mini-windows nil))
 
 (defun mini-modeline-msg ()
   "Place holder to display echo area message."
@@ -271,7 +285,6 @@ BODY will be supplied with orig-func and args."
              (mini-modeline--set-buffer-background)))))
    (buffer-list))
   (redisplay)
-  (setq resize-mini-windows t)
   (add-hook 'pre-redisplay-functions #'mini-modeline-display)
   (when mini-modeline-enhance-visual
     (add-hook 'minibuffer-setup-hook #'mini-modeline--set-buffer-background)
@@ -293,6 +306,10 @@ BODY will be supplied with orig-func and args."
    (let ((mode-line-format mini-modeline-r-format))
      (apply orig-func args)
      (setq mini-modeline-r-format mode-line-format)))
+  ;; take control of mini-buffer size
+  (add-hook 'minibuffer-setup-hook 'mini-modeline--minibuffer-setup t)
+  (add-hook 'minibuffer-exit-hook 'mini-modeline--minibuffer-exit)
+  (setq resize-mini-windows nil)
 
   ;; read-key-sequence
   (mini-modeline--wrap
@@ -335,6 +352,11 @@ BODY will be supplied with orig-func and args."
 
   (advice-remove #'read-key-sequence 'mini-modeline--read-key-sequence)
   (advice-remove #'read-key-sequence-vector 'mini-modeline--read-key-sequence-vector)
+
+  (remove-hook 'minibuffer-setup-hook 'mini-modeline--minibuffer-setup t)
+  (remove-hook 'minibuffer-exit-hook 'mini-modeline--minibuffer-exit)
+  ;; release control of mini-buffer size
+  (setq resize-mini-windows t)
   )
 
 ;;;###autoload
