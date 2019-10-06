@@ -120,12 +120,16 @@ Nil means current selected frame."
                  `(default (:background ,mini-modeline-color)))))
 
 (defun mini-modeline--log (&rest args)
-  "Log into message buffer with ARGS as same parameters in `message'."
+  "Log message into message buffer with ARGS as same parameters in `message'."
   (save-excursion
     (with-current-buffer "*Messages*"
       (let ((inhibit-read-only t))
         (goto-char (point-max))
         (insert (apply #'format args))))))
+
+(defmacro mini-modeline--overduep (since duration)
+  "Check if time already pass DURATION from SINCE."
+  `(>= (float-time (time-since ,since)) ,duration))
 
 (defun mini-modeline-display (&optional arg)
   "Update mini-modeline.
@@ -143,8 +147,8 @@ When ARG is:
                     (inhibit-redisplay t)
                     (buffer-undo-list t))
                 (when (or (memq arg '(force clear))
-                          (>= (float-time (time-since mini-modeline--last-update))
-                              mini-modeline-update-interval))
+                          (mini-modeline--overduep mini-modeline--last-update
+                                                   mini-modeline-update-interval))
                   (let ((msg (or mini-modeline--msg-message (current-message))))
                     (when msg
                       ;; Clear echo area and start new timer for echo message
@@ -163,8 +167,8 @@ When ARG is:
                   ;; Reset echo message when timeout and not in middle of command
                   (when (and mini-modeline--msg
                              (not (eq mini-modeline--command-state 'exec))
-                             (>= (float-time (time-since mini-modeline--last-echoed))
-                                 mini-modeline-echo-duration))
+                             (mini-modeline--overduep mini-modeline--last-echoed
+                                                      mini-modeline-echo-duration))
                     (setq mini-modeline--msg nil))
                   ;; Showing mini-modeline
                   (if (eq arg 'clear)
@@ -178,26 +182,19 @@ When ARG is:
                   ;; write to minibuffer
                   (erase-buffer)
                   (when mini-modeline--cache
-                    (let ((height-increase (- (cdr mini-modeline--cache)
+                    (let ((height-delta (- (cdr mini-modeline--cache)
                                               (window-height (minibuffer-window mini-modeline-frame))))
                           ;; ; let mini-modeline take control of mini-buffer size
                           (resize-mini-windows t))
-                      (when (or (> height-increase 0)
+                      (when (or (> height-delta 0)
                                 ;; this is to prevent window flashing for consecutive multi-line message
-                                (>= (float-time (time-since mini-modeline--last-change-size))
-                                    mini-modeline-echo-duration))
-                        (window-resize (minibuffer-window mini-modeline-frame)
-                                       height-increase)
-                        (setq mini-modeline--last-change-size (current-time))))
-                    (insert (car mini-modeline--cache))))))))
+                                (mini-modeline--overduep mini-modeline--last-change-size
+                                                         mini-modeline-echo-duration))
+                        (window-resize (minibuffer-window mini-modeline-frame) height-delta)
+                        (setq mini-modeline--last-change-size (current-time)))
+                      (insert (car mini-modeline--cache)))))))))
       ((error debug)
        (mini-modeline--log "mini-modeline: %s\n" err)))))
-
-(defun mini-modeline--minibuffer-setup ()
-  (setq resize-mini-windows t))
-
-(defun mini-modeline--minibuffer-exit ()
-  (setq resize-mini-windows nil))
 
 (defun mini-modeline-msg ()
   "Place holder to display echo area message."
@@ -270,10 +267,8 @@ BODY will be supplied with orig-func and args."
 (declare-function anzu--cons-mode-line "anzu")
 (declare-function anzu--reset-mode-line "anzu")
 
-;;;###autoload
 (defun mini-modeline-enable ()
   "Enable `mini-modeline'."
-  (interactive)
   ;; Hide all modeline
   (setq-default mode-line-format nil)
   (mapc
@@ -285,6 +280,7 @@ BODY will be supplied with orig-func and args."
              (mini-modeline--set-buffer-background)))))
    (buffer-list))
   (redisplay)
+  (setq resize-mini-windows t)
   (add-hook 'pre-redisplay-functions #'mini-modeline-display)
   (when mini-modeline-enhance-visual
     (add-hook 'minibuffer-setup-hook #'mini-modeline--set-buffer-background)
@@ -306,10 +302,6 @@ BODY will be supplied with orig-func and args."
    (let ((mode-line-format mini-modeline-r-format))
      (apply orig-func args)
      (setq mini-modeline-r-format mode-line-format)))
-  ;; take control of mini-buffer size
-  (add-hook 'minibuffer-setup-hook 'mini-modeline--minibuffer-setup t)
-  (add-hook 'minibuffer-exit-hook 'mini-modeline--minibuffer-exit)
-  (setq resize-mini-windows nil)
 
   ;; read-key-sequence
   (mini-modeline--wrap
@@ -324,10 +316,8 @@ BODY will be supplied with orig-func and args."
      (apply orig-func args)))
   )
 
-;;;###autoload
 (defun mini-modeline-disable ()
   "Disable `mini-modeline'."
-  (interactive)
   (setq-default mode-line-format mini-modeline--orig-mode-line)
   (mapc
    (lambda (buf)
@@ -352,11 +342,6 @@ BODY will be supplied with orig-func and args."
 
   (advice-remove #'read-key-sequence 'mini-modeline--read-key-sequence)
   (advice-remove #'read-key-sequence-vector 'mini-modeline--read-key-sequence-vector)
-
-  (remove-hook 'minibuffer-setup-hook 'mini-modeline--minibuffer-setup t)
-  (remove-hook 'minibuffer-exit-hook 'mini-modeline--minibuffer-exit)
-  ;; release control of mini-buffer size
-  (setq resize-mini-windows t)
   )
 
 ;;;###autoload
