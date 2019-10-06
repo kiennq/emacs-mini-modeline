@@ -204,7 +204,7 @@ When ARG is:
   "Render the LEFT and RIGHT part of mini-modeline."
   (let* ((left (or left ""))
          (right (or right ""))
-         (available-width (- (frame-width mini-modeline-frame) (string-width left) 3))
+         (available-width (max (- (frame-width mini-modeline-frame) (string-width left) 3) 0))
          (required-width (string-width right)))
     (if (< available-width required-width)
         (if mini-modeline-truncate-p
