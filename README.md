@@ -10,7 +10,7 @@ Allows to display mode line information in minibuffer.
 ![mini-modeline in action](screenshots/mini-modeline.gif)
 
 # Install
-## Using melpa
+## Using [Melpa](https://melpa.org/#/mini-modeline)
 ## Using [`Quelpa`](https://framagit.org/steckerhalter/quelpa)
 
 Example:
