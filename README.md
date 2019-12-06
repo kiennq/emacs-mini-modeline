@@ -24,7 +24,7 @@ Example:
   (mini-modeline-mode t))
 ```
 
-Although I would recommend my `Quelpa` [fork](https://github.com/kiennq/quelpa) since it allows to shallow clone git repo and can run on Windows 10 with built-in `tar`.
+Although I would recommend my `Quelpa` [fork](https://framagit.org/kiennq/quelpa) since it allows to shallow clone git repo and can run on Windows 10 with built-in `tar`.
 
 ## Manually
 Just clone this repo and put it in your `load-path`.
