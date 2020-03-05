@@ -171,7 +171,7 @@ When ARG is:
                     (setq mini-modeline--msg msg))
                   ;; Reset echo message when timeout and not in middle of command
                   (when (and mini-modeline--msg
-                             (not (eq mini-modeline--command-state 'exec))
+                             (not (memq mini-modeline--command-state '(exec exec-read)))
                              (mini-modeline--overduep mini-modeline--last-echoed
                                                       mini-modeline-echo-duration))
                     (setq mini-modeline--msg nil))
