@@ -11,7 +11,7 @@ Allows to display mode line information in minibuffer.
 
 # Install
 ## Using [Melpa](https://melpa.org/#/mini-modeline)
-## Using [`Quelpa`](https://framagit.org/steckerhalter/quelpa)
+## Using [`Quelpa`](https://github.com/quelpa/quelpa)
 
 Example:
 
@@ -23,8 +23,6 @@ Example:
   :config
   (mini-modeline-mode t))
 ```
-
-Although I would recommend my `Quelpa` [fork](https://framagit.org/kiennq/quelpa) since it allows to shallow clone git repo and can run on Windows 10 with built-in `tar`.
 
 ## Manually
 Just clone this repo and put it in your `load-path`.
