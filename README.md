@@ -72,6 +72,9 @@ You can customize those variable for better experiences.
 8. `mini-modeline-truncate-p`
    Truncates the `mini-modeline` to fit in one line.
 
+9. `mini-modeline-right-padding`
+   Padding to use in the right side. Set this to the minimal value that doesn't cause truncation.
+
 # Why?
 
 Echo area or `minibuffer` which reside in it is a big waste most of the time.
