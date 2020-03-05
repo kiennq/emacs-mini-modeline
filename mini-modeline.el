@@ -203,7 +203,7 @@ When ARG is:
 
 (defun mini-modeline-msg ()
   "Place holder to display echo area message."
-  `(format "%s" mini-modeline--msg))
+  (replace-regexp-in-string "%" "%%" mini-modeline--msg))
 
 (defsubst mini-modeline--lr-render (left right)
   "Render the LEFT and RIGHT part of mini-modeline."
