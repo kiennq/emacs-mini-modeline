@@ -80,8 +80,28 @@ Will be set if `mini-modeline-enhance-visual' is t."
   :type 'boolean
   :group 'mini-modeline)
 
+(defface mini-modeline-mode-line
+  '((((background light))
+     :background "#55ced1" :height 0.14 :box nil)
+    (t
+     :background "#008b8b" :height 0.14 :box nil))
+  "Modeline face for active window."
+  :group 'mini-modeline)
+
+(defface mini-modeline-mode-line-inactive
+  '((((background light))
+     :background "#dddddd" :height 0.1 :box nil)
+    (t
+     :background "#333333" :height 0.1 :box nil))
+  "Modeline face for inactive window."
+  :group 'mini-modeline)
+
 (defvar mini-modeline--orig-mode-line mode-line-format)
 (defvar mini-modeline--echo-keystrokes echo-keystrokes)
+(defvar mini-modeline--orig-mode-line-remap
+  (or (alist-get 'mode-line face-remapping-alist) 'mode-line))
+(defvar mini-modeline--orig-mode-line-inactive-remap
+  (or (alist-get 'mode-line-inactive face-remapping-alist) 'mode-line-inactive))
 
 (defcustom mini-modeline-echo-duration 2
   "Duration to keep display echo."
@@ -279,16 +299,27 @@ BODY will be supplied with orig-func and args."
 
 (defun mini-modeline-enable ()
   "Enable `mini-modeline'."
-  ;; Hide all modeline
-  (setq-default mode-line-format nil)
+  ;; Hide modeline for terminal, or use empty modeline for GUI.
+  (if (display-graphic-p)
+      (setq-default mode-line-format " ")
+    (setq-default mode-line-format nil))
+  ;; Do the same thing with opening buffers.
   (mapc
    (lambda (buf)
      (unless (string-prefix-p " " (buffer-name buf))
        (with-current-buffer buf
-         (setq mode-line-format nil)
+         (if (display-graphic-p)
+             (setq mode-line-format " ")
+           (setq mode-line-format nil))
          (if (and (minibufferp) mini-modeline-enhance-visual)
              (mini-modeline--set-buffer-background)))))
    (buffer-list))
+  ;; Make the modeline in GUI a thin bar.
+  (when (display-graphic-p)
+    (setf (alist-get 'mode-line face-remapping-alist)
+          'mini-modeline-mode-line)
+    (setf (alist-get 'mode-line-inactive face-remapping-alist)
+          'mini-modeline-mode-line-inactive))
   (redisplay)
   (setq resize-mini-windows t)
   (add-hook 'pre-redisplay-functions #'mini-modeline-display)
@@ -329,6 +360,11 @@ BODY will be supplied with orig-func and args."
 (defun mini-modeline-disable ()
   "Disable `mini-modeline'."
   (setq-default mode-line-format mini-modeline--orig-mode-line)
+  (when (display-graphic-p)
+    (setf (alist-get 'mode-line face-remapping-alist)
+          mini-modeline--orig-mode-line-remap)
+    (setf (alist-get 'mode-line-inactive face-remapping-alist)
+          mini-modeline--orig-mode-line-inactive-remap))
   (mapc
    (lambda (buf)
      (unless (string-prefix-p " " (buffer-name buf))
