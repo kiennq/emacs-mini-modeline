@@ -267,15 +267,6 @@ Return value is (STRING . LINES)."
            (mini-modeline--msg-message (apply func args)))
       (mini-modeline-display 'force))))
 
-(defun mini-modeline--window-divider (&optional reset)
-  "Setup command `window-divider-mode' or RESET it."
-  (if reset
-      (window-divider-mode -1)
-    (setq window-divider-default-places t
-          window-divider-default-bottom-width 1
-          window-divider-default-right-width 1)
-    (window-divider-mode 1)))
-
 (defmacro mini-modeline--wrap (func &rest body)
   "Add an advice around FUNC with name mini-modeline--%s.
 BODY will be supplied with orig-func and args."
@@ -324,9 +315,7 @@ BODY will be supplied with orig-func and args."
   (setq resize-mini-windows t)
   (add-hook 'pre-redisplay-functions #'mini-modeline-display)
   (when mini-modeline-enhance-visual
-    (add-hook 'minibuffer-setup-hook #'mini-modeline--set-buffer-background)
-    ;; set up `window-divider-mode' for visibility
-    (mini-modeline--window-divider))
+    (add-hook 'minibuffer-setup-hook #'mini-modeline--set-buffer-background))
   (advice-add #'message :around #'mini-modeline--reroute-msg)
   (add-hook 'pre-command-hook #'mini-modeline--pre-cmd)
   (add-hook 'post-command-hook #'mini-modeline--post-cmd)
@@ -376,8 +365,7 @@ BODY will be supplied with orig-func and args."
   (remove-hook 'pre-redisplay-functions #'mini-modeline-display)
   (mini-modeline-display 'clear)
   (when mini-modeline-enhance-visual
-    (remove-hook 'minibuffer-setup-hook #'mini-modeline--set-buffer-background)
-    (mini-modeline--window-divider 'reset))
+    (remove-hook 'minibuffer-setup-hook #'mini-modeline--set-buffer-background))
   (advice-remove #'message #'mini-modeline--reroute-msg)
   (remove-hook 'pre-command-hook #'mini-modeline--pre-cmd)
   (remove-hook 'post-command-hook #'mini-modeline--post-cmd)
