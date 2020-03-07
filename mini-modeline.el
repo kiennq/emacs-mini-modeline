@@ -290,6 +290,7 @@ BODY will be supplied with orig-func and args."
 (declare-function anzu--cons-mode-line "ext:anzu")
 (declare-function anzu--reset-mode-line "ext:anzu")
 
+(defvar mini-modeline--orig-resize-mini-windows resize-mini-windows)
 (defvar mini-modeline--timer nil)
 
 (defun mini-modeline--enable ()
@@ -315,8 +316,8 @@ BODY will be supplied with orig-func and args."
           'mini-modeline-mode-line)
     (setf (alist-get 'mode-line-inactive face-remapping-alist)
           'mini-modeline-mode-line-inactive))
+  (setq resize-mini-windows nil)
   (redisplay)
-  (setq resize-mini-windows t)
   ;; (add-hook 'pre-redisplay-functions #'mini-modeline-display)
   (setq mini-modeline--timer (run-with-timer 0 0.1 #'mini-modeline-display))
   (when mini-modeline-enhance-visual
@@ -365,6 +366,7 @@ BODY will be supplied with orig-func and args."
        (with-current-buffer buf
          (setq mode-line-format mini-modeline--orig-mode-line))))
    (buffer-list))
+  (setq resize-mini-windows mini-modeline--orig-resize-mini-windows)
   (redisplay)
   ;; (remove-hook 'post-command-hook #'mini-modeline-display)
   ;; (remove-hook 'pre-redisplay-functions #'mini-modeline-display)
