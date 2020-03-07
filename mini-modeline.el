@@ -31,6 +31,7 @@
 (require 'minibuffer)
 (require 'dash)
 (require 'frame)
+(require 'timer)
 
 (eval-when-compile
   (require 'subr-x)
@@ -285,10 +286,12 @@ BODY will be supplied with orig-func and args."
   (setq mini-modeline--command-state 'end
         echo-keystrokes mini-modeline--echo-keystrokes))
 
-(declare-function anzu--cons-mode-line "anzu")
-(declare-function anzu--reset-mode-line "anzu")
+(declare-function anzu--cons-mode-line "ext:anzu")
+(declare-function anzu--reset-mode-line "ext:anzu")
 
-(defun mini-modeline-enable ()
+(defvar mini-modeline--timer nil)
+
+(defun mini-modeline--enable ()
   "Enable `mini-modeline'."
   ;; Hide modeline for terminal, or use empty modeline for GUI.
   (if (display-graphic-p)
@@ -313,7 +316,8 @@ BODY will be supplied with orig-func and args."
           'mini-modeline-mode-line-inactive))
   (redisplay)
   (setq resize-mini-windows t)
-  (add-hook 'pre-redisplay-functions #'mini-modeline-display)
+  ;; (add-hook 'pre-redisplay-functions #'mini-modeline-display)
+  (setq mini-modeline--timer (run-with-timer 0 0.5 #'mini-modeline-display))
   (when mini-modeline-enhance-visual
     (add-hook 'minibuffer-setup-hook #'mini-modeline--set-buffer-background))
   (advice-add #'message :around #'mini-modeline--reroute-msg)
@@ -346,7 +350,7 @@ BODY will be supplied with orig-func and args."
      (apply orig-func args)))
   )
 
-(defun mini-modeline-disable ()
+(defun mini-modeline--disable ()
   "Disable `mini-modeline'."
   (setq-default mode-line-format mini-modeline--orig-mode-line)
   (when (display-graphic-p)
@@ -362,7 +366,8 @@ BODY will be supplied with orig-func and args."
    (buffer-list))
   (redisplay)
   ;; (remove-hook 'post-command-hook #'mini-modeline-display)
-  (remove-hook 'pre-redisplay-functions #'mini-modeline-display)
+  ;; (remove-hook 'pre-redisplay-functions #'mini-modeline-display)
+  (when (timerp (cancel-timer mini-modeline--timer)))
   (mini-modeline-display 'clear)
   (when mini-modeline-enhance-visual
     (remove-hook 'minibuffer-setup-hook #'mini-modeline--set-buffer-background))
@@ -386,8 +391,8 @@ BODY will be supplied with orig-func and args."
   :group 'mini-modeline
   :lighter " Minimode"
   (if mini-modeline-mode
-      (mini-modeline-enable)
-    (mini-modeline-disable)))
+      (mini-modeline--enable)
+    (mini-modeline--disable)))
 
 (provide 'mini-modeline)
 ;;; mini-modeline.el ends here
