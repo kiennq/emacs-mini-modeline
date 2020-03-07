@@ -224,7 +224,8 @@ When ARG is:
 
 (defun mini-modeline-msg ()
   "Place holder to display echo area message."
-  (replace-regexp-in-string "%" "%%" mini-modeline--msg))
+  (when mini-modeline--msg
+    (replace-regexp-in-string "%" "%%" mini-modeline--msg)))
 
 (defsubst mini-modeline--lr-render (left right)
   "Render the LEFT and RIGHT part of mini-modeline."
@@ -317,7 +318,7 @@ BODY will be supplied with orig-func and args."
   (redisplay)
   (setq resize-mini-windows t)
   ;; (add-hook 'pre-redisplay-functions #'mini-modeline-display)
-  (setq mini-modeline--timer (run-with-timer 0 0.5 #'mini-modeline-display))
+  (setq mini-modeline--timer (run-with-timer 0 0.1 #'mini-modeline-display))
   (when mini-modeline-enhance-visual
     (add-hook 'minibuffer-setup-hook #'mini-modeline--set-buffer-background))
   (advice-add #'message :around #'mini-modeline--reroute-msg)
