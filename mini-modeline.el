@@ -289,6 +289,7 @@ BODY will be supplied with orig-func and args."
   (setq mini-modeline--command-state 'end
         echo-keystrokes mini-modeline--echo-keystrokes))
 
+(defvar mini-modeline--orig-resize-mini-windows resize-mini-windows)
 (defsubst mini-modeline--enter-minibuffer ()
   "`minibuffer-setup-hook' of mini-modeline."
   (when mini-modeline-enhance-visual
@@ -302,7 +303,6 @@ BODY will be supplied with orig-func and args."
 (declare-function anzu--cons-mode-line "ext:anzu")
 (declare-function anzu--reset-mode-line "ext:anzu")
 
-(defvar mini-modeline--orig-resize-mini-windows resize-mini-windows)
 (defvar mini-modeline--timer nil)
 
 (defun mini-modeline--enable ()
