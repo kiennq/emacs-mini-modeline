@@ -45,7 +45,7 @@
 ;; Forward declaration for evil-mode-line-tag
 (defvar evil-mode-line-tag)
 
-(defcustom mini-modeline-l-format '(:eval (mini-modeline-msg))
+(defcustom mini-modeline-l-format nil
   "Left part of mini-modeline, same format with `mode-line-format'."
   :type `(repeat symbol)
   :group 'mini-modeline)
@@ -201,7 +201,9 @@ When ARG is:
                       (setq mini-modeline--cache nil)
                     (setq mini-modeline--cache
                           (mini-modeline--multi-lr-render
-                           (string-trim (format-mode-line mini-modeline-l-format))
+                           (string-trim (if mini-modeline--msg
+                                            (format-mode-line '(:eval (mini-modeline-msg)))
+                                          (format-mode-line mini-modeline-l-format)))
                            (string-trim (format-mode-line mini-modeline-r-format))))
                     (setq mini-modeline--last-update (current-time)))
 
