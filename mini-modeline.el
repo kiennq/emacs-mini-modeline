@@ -238,15 +238,16 @@ When ARG is:
                                   mini-modeline-right-padding)
                                0))
          (required-width (string-width right)))
+    ;; (mini-modeline--log "a:%s r:%s\n" available-width required-width)
     (if (< available-width required-width)
         (if mini-modeline-truncate-p
             (cons
-             (format (format "%%s %%%1$d.%1$ds" available-width) left right)
+             ;; Emacs 25 cannot use position format
+             (format (format "%%s %%%d.%ds" available-width available-width) left right)
              0)
           (cons
-           (format (format "%%%1$d.%1$ds\n%%s" (- (frame-width mini-modeline-frame)
-                                                  mini-modeline-right-padding))
-                   right left)
+           (let ((available-width (+ available-width (string-width left))))
+             (format (format "%%0.%ds\n%%s" available-width) right left))
            1))
       (cons (format (format "%%s %%%ds" available-width) left right) 0))))
 
