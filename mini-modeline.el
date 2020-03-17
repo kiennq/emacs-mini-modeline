@@ -310,7 +310,7 @@ BODY will be supplied with orig-func and args."
   "Enable `mini-modeline'."
   ;; Hide modeline for terminal, or use empty modeline for GUI.
   (if (display-graphic-p)
-      (setq-default mode-line-format " ")
+      (setq-default mode-line-format '(" "))
     (setq-default mode-line-format nil))
   ;; Do the same thing with opening buffers.
   (mapc
@@ -318,7 +318,7 @@ BODY will be supplied with orig-func and args."
      (unless (string-prefix-p " " (buffer-name buf))
        (with-current-buffer buf
          (if (display-graphic-p)
-             (setq mode-line-format " ")
+             (setq mode-line-format '(" "))
            (setq mode-line-format nil))
          (if (and (minibufferp buf) mini-modeline-enhance-visual)
              (mini-modeline--set-buffer-background)))))
