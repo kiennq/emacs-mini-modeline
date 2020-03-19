@@ -59,8 +59,8 @@
                                     mode-line-buffer-identification
                                     " " mode-line-position " "
                                     evil-mode-line-tag
-                                    mode-line-modes mode-line-misc-info
-                                    mode-line-end-spaces)
+                                    (:eval (string-trim (format-mode-line mode-line-modes)))
+                                    mode-line-misc-info)
   "Right part of mini-modeline, same format with `mode-line-format'."
   :type `(repeat symbol)
   :group 'mini-modeline)
@@ -201,10 +201,10 @@ When ARG is:
                       (setq mini-modeline--cache nil)
                     (setq mini-modeline--cache
                           (mini-modeline--multi-lr-render
-                           (string-trim (if mini-modeline--msg
-                                            (format-mode-line '(:eval (mini-modeline-msg)))
-                                          (format-mode-line mini-modeline-l-format)))
-                           (string-trim (format-mode-line mini-modeline-r-format))))
+                           (if mini-modeline--msg
+                               (format-mode-line '(:eval (mini-modeline-msg)))
+                             (format-mode-line mini-modeline-l-format))
+                           (format-mode-line mini-modeline-r-format)))
                     (setq mini-modeline--last-update (current-time)))
 
                   ;; write to minibuffer
