@@ -3,5 +3,6 @@
 tags
 .DS_Store
 .#*
+*.elc
 dist/
 .cask/

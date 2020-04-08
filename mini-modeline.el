@@ -32,6 +32,7 @@
 (require 'dash)
 (require 'frame)
 (require 'timer)
+(require 'face-remap)
 
 (eval-when-compile
   (require 'subr-x)
