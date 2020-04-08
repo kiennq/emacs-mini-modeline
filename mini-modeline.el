@@ -65,10 +65,9 @@
   :type `(repeat symbol)
   :group 'mini-modeline)
 
-(defcustom mini-modeline-color (face-background 'mode-line)
-  "Background of mini-modeline.
-Will be set if `mini-modeline-enhance-visual' is t."
-  :type 'string
+(defcustom mini-modeline-face-attr `(:background ,(face-attribute 'mode-line :background))
+  "Plist of face attribute/value pair for mini-modeline."
+  :type '(plist)
   :group 'mini-modeline)
 
 (defcustom mini-modeline-truncate-p t
@@ -139,12 +138,9 @@ Set this to the minimal value that doesn't cause truncation."
 (defvar mini-modeline--command-state 'begin
   "The state of current executed command begin -> [exec exec-read] -> end.")
 
-(defun mini-modeline--set-buffer-background ()
-  "Set buffer background for current buffer."
-  (when mini-modeline-color
-    (make-local-variable 'face-remapping-alist)
-    (setf (alist-get 'default face-remapping-alist)
-          `((:background ,mini-modeline-color)))))
+(defun mini-modeline--set-buffer-face ()
+  "Set buffer default face for current buffer."
+  (face-remap-add-relative 'default mini-modeline-face-attr))
 
 (defun mini-modeline--log (&rest args)
   "Log message into message buffer with ARGS as same parameters in `message'."
@@ -294,7 +290,7 @@ BODY will be supplied with orig-func and args."
 (defsubst mini-modeline--enter-minibuffer ()
   "`minibuffer-setup-hook' of mini-modeline."
   (when mini-modeline-enhance-visual
-    (mini-modeline--set-buffer-background))
+    (mini-modeline--set-buffer-face))
   (setq resize-mini-windows mini-modeline--orig-resize-mini-windows))
 
 (defsubst mini-modeline--exit-minibuffer ()
@@ -306,6 +302,7 @@ BODY will be supplied with orig-func and args."
 
 (defvar mini-modeline--timer nil)
 
+(defvar-local mini-modeline--face-cookie nil)
 (defun mini-modeline--enable ()
   "Enable `mini-modeline'."
   ;; Hide modeline for terminal, or use empty modeline for GUI.
@@ -317,8 +314,10 @@ BODY will be supplied with orig-func and args."
      (with-current-buffer buf
        (setq mini-modeline--orig-mode-line mode-line-format)
        (setq mode-line-format (when (display-graphic-p) '(" ")))
-       (if (and (minibufferp buf) mini-modeline-enhance-visual)
-           (mini-modeline--set-buffer-background))))
+       (when (and mini-modeline-enhance-visual
+                  (or (minibufferp buf)
+                      (string-prefix-p " *Echo Area" (buffer-name))))
+         (setq mini-modeline--face-cookie (mini-modeline--set-buffer-face)))))
    (buffer-list))
   ;; Make the modeline in GUI a thin bar.
   (when (display-graphic-p)
@@ -374,7 +373,9 @@ BODY will be supplied with orig-func and args."
   (mapc
    (lambda (buf)
      (with-current-buffer buf
-       (setq mode-line-format mini-modeline--orig-mode-line)))
+       (setq mode-line-format mini-modeline--orig-mode-line)
+       (when mini-modeline--face-cookie
+         (face-remap-remove-relative mini-modeline--face-cookie))))
    (buffer-list))
   (setq resize-mini-windows mini-modeline--orig-resize-mini-windows)
   (redisplay)

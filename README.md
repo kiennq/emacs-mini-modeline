@@ -50,8 +50,8 @@ You can customize those variable for better experiences.
 2. `mini-modeline-r-format`
    Right part of mini-modeline, same format with `mode-line-format`.
 
-3. `mini-modeline-color`
-   Background of mini-modeline. Will be set if `mini-modeline-enhance-visual` is t.
+3. `mini-modeline-face-attr`
+    Plist of face attribute/value pair for mini-modeline.
 
 4. `mini-modeline-enhance-visual`
    Enhance minibuffer and window's visibility. This will enable `window-divider-mode` since without the mode line, two continuous windows are nearly indistinguishable.
