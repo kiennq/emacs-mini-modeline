@@ -97,7 +97,7 @@ Will be set if `mini-modeline-enhance-visual' is t."
   "Modeline face for inactive window."
   :group 'mini-modeline)
 
-(defvar mini-modeline--orig-mode-line mode-line-format)
+(defvar-local mini-modeline--orig-mode-line mode-line-format)
 (defvar mini-modeline--echo-keystrokes echo-keystrokes)
 (defvar mini-modeline--orig-mode-line-remap
   (or (alist-get 'mode-line face-remapping-alist) 'mode-line))
@@ -309,19 +309,16 @@ BODY will be supplied with orig-func and args."
 (defun mini-modeline--enable ()
   "Enable `mini-modeline'."
   ;; Hide modeline for terminal, or use empty modeline for GUI.
-  (if (display-graphic-p)
-      (setq-default mode-line-format '(" "))
-    (setq-default mode-line-format nil))
+  (setq-default mini-modeline--orig-mode-line mode-line-format)
+  (setq-default mode-line-format (when (display-graphic-p) '(" ")))
   ;; Do the same thing with opening buffers.
   (mapc
    (lambda (buf)
-     (unless (string-prefix-p " " (buffer-name buf))
-       (with-current-buffer buf
-         (if (display-graphic-p)
-             (setq mode-line-format '(" "))
-           (setq mode-line-format nil))
-         (if (and (minibufferp buf) mini-modeline-enhance-visual)
-             (mini-modeline--set-buffer-background)))))
+     (with-current-buffer buf
+       (setq mini-modeline--orig-mode-line mode-line-format)
+       (setq mode-line-format (when (display-graphic-p) '(" ")))
+       (if (and (minibufferp buf) mini-modeline-enhance-visual)
+           (mini-modeline--set-buffer-background))))
    (buffer-list))
   ;; Make the modeline in GUI a thin bar.
   (when (display-graphic-p)
@@ -376,9 +373,8 @@ BODY will be supplied with orig-func and args."
           mini-modeline--orig-mode-line-inactive-remap))
   (mapc
    (lambda (buf)
-     (unless (string-prefix-p " " (buffer-name buf))
-       (with-current-buffer buf
-         (setq mode-line-format mini-modeline--orig-mode-line))))
+     (with-current-buffer buf
+       (setq mode-line-format mini-modeline--orig-mode-line)))
    (buffer-list))
   (setq resize-mini-windows mini-modeline--orig-resize-mini-windows)
   (redisplay)
