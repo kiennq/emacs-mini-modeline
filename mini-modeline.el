@@ -302,8 +302,8 @@ BODY will be supplied with orig-func and args."
 (declare-function anzu--reset-mode-line "ext:anzu")
 
 (defvar mini-modeline--timer nil)
-
 (defvar-local mini-modeline--face-cookie nil)
+
 (defun mini-modeline--enable ()
   "Enable `mini-modeline'."
   ;; Hide modeline for terminal, or use empty modeline for GUI.
@@ -318,14 +318,24 @@ BODY will be supplied with orig-func and args."
        (when (and mini-modeline-enhance-visual
                   (or (minibufferp buf)
                       (string-prefix-p " *Echo Area" (buffer-name))))
-         (setq mini-modeline--face-cookie (mini-modeline--set-buffer-face)))))
+         (setq mini-modeline--face-cookie (mini-modeline--set-buffer-face)))
+       ;; Make the modeline in GUI a thin bar.
+       (when (and (local-variable-p 'face-remapping-alist) (display-graphic-p))
+         (setf (alist-get 'mode-line face-remapping-alist)
+               'mini-modeline-mode-line
+               (alist-get 'mode-line-inactive face-remapping-alist)
+               'mini-modeline-mode-line-inactive))))
    (buffer-list))
+
   ;; Make the modeline in GUI a thin bar.
   (when (display-graphic-p)
-    (setf (alist-get 'mode-line face-remapping-alist)
-          'mini-modeline-mode-line)
-    (setf (alist-get 'mode-line-inactive face-remapping-alist)
-          'mini-modeline-mode-line-inactive))
+    (let ((face-remaps (default-value 'face-remapping-alist)))
+      (setf (alist-get 'mode-line face-remaps)
+            'mini-modeline-mode-line
+            (alist-get 'mode-line-inactive face-remaps)
+            'mini-modeline-mode-line-inactive
+            (default-value 'face-remapping-alist) face-remaps)))
+
   (setq resize-mini-windows nil)
   (redisplay)
   ;; (add-hook 'pre-redisplay-functions #'mini-modeline-display)
@@ -367,17 +377,26 @@ BODY will be supplied with orig-func and args."
   "Disable `mini-modeline'."
   (setq-default mode-line-format mini-modeline--orig-mode-line)
   (when (display-graphic-p)
-    (setf (alist-get 'mode-line face-remapping-alist)
-          mini-modeline--orig-mode-line-remap)
-    (setf (alist-get 'mode-line-inactive face-remapping-alist)
-          mini-modeline--orig-mode-line-inactive-remap))
+    (let ((face-remaps (default-value 'face-remapping-alist)))
+      (setf (alist-get 'mode-line face-remaps)
+            mini-modeline--orig-mode-line-remap
+            (alist-get 'mode-line-inactive face-remaps)
+            mini-modeline--orig-mode-line-inactive-remap
+            (default-value 'face-remapping-alist) face-remaps)))
+
   (mapc
    (lambda (buf)
      (with-current-buffer buf
        (setq mode-line-format mini-modeline--orig-mode-line)
        (when mini-modeline--face-cookie
-         (face-remap-remove-relative mini-modeline--face-cookie))))
+         (face-remap-remove-relative mini-modeline--face-cookie))
+       (when (and (local-variable-p 'face-remapping-alist) (display-graphic-p))
+         (setf (alist-get 'mode-line face-remapping-alist)
+               mini-modeline--orig-mode-line-remap
+               (alist-get 'mode-line-inactive face-remapping-alist)
+               mini-modeline--orig-mode-line-inactive-remap))))
    (buffer-list))
+
   (setq resize-mini-windows mini-modeline--orig-resize-mini-windows)
   (redisplay)
   ;; (remove-hook 'post-command-hook #'mini-modeline-display)
