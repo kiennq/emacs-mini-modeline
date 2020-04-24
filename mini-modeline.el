@@ -313,8 +313,9 @@ BODY will be supplied with orig-func and args."
   (mapc
    (lambda (buf)
      (with-current-buffer buf
-       (setq mini-modeline--orig-mode-line mode-line-format)
-       (setq mode-line-format (when (display-graphic-p) '(" ")))
+       (when (local-variable-p 'mode-line-format)
+         (setq mini-modeline--orig-mode-line mode-line-format)
+         (setq mode-line-format (when (display-graphic-p) '(" "))))
        (when (and mini-modeline-enhance-visual
                   (or (minibufferp buf)
                       (string-prefix-p " *Echo Area" (buffer-name))))
@@ -375,7 +376,7 @@ BODY will be supplied with orig-func and args."
 
 (defun mini-modeline--disable ()
   "Disable `mini-modeline'."
-  (setq-default mode-line-format mini-modeline--orig-mode-line)
+  (setq-default mode-line-format (default-value 'mini-modeline--orig-mode-line))
   (when (display-graphic-p)
     (let ((face-remaps (default-value 'face-remapping-alist)))
       (setf (alist-get 'mode-line face-remaps)
@@ -387,7 +388,8 @@ BODY will be supplied with orig-func and args."
   (mapc
    (lambda (buf)
      (with-current-buffer buf
-       (setq mode-line-format mini-modeline--orig-mode-line)
+       (when (local-variable-p 'mode-line-format)
+         (setq mode-line-format mini-modeline--orig-mode-line))
        (when mini-modeline--face-cookie
          (face-remap-remove-relative mini-modeline--face-cookie))
        (when (and (local-variable-p 'face-remapping-alist) (display-graphic-p))
