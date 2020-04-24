@@ -292,7 +292,7 @@ BODY will be supplied with orig-func and args."
   "`minibuffer-setup-hook' of mini-modeline."
   (when mini-modeline-enhance-visual
     (mini-modeline--set-buffer-face))
-  (setq resize-mini-windows mini-modeline--orig-resize-mini-windows))
+  (setq resize-mini-windows 'grow-only))
 
 (defsubst mini-modeline--exit-minibuffer ()
   "`minibuffer-exit-hook' of mini-modeline."
@@ -337,6 +337,7 @@ BODY will be supplied with orig-func and args."
             'mini-modeline-mode-line-inactive
             (default-value 'face-remapping-alist) face-remaps)))
 
+  (setq mini-modeline--orig-resize-mini-windows resize-mini-windows)
   (setq resize-mini-windows nil)
   (redisplay)
   ;; (add-hook 'pre-redisplay-functions #'mini-modeline-display)
