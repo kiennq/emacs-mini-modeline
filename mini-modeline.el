@@ -303,8 +303,8 @@ BODY will be supplied with orig-func and args."
 (defsubst mini-modeline--exit-minibuffer ()
   "`minibuffer-exit-hook' of mini-modeline."
   (when mini-modeline-enhance-visual
-  (with-current-buffer mini-modeline--minibuffer
-    (mini-modeline--set-buffer-face)))
+    (with-current-buffer mini-modeline--minibuffer
+      (mini-modeline--set-buffer-face)))
   (setq resize-mini-windows nil))
 
 (declare-function anzu--cons-mode-line "ext:anzu")
