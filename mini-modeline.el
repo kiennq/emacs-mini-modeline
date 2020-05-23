@@ -302,14 +302,9 @@ BODY will be supplied with orig-func and args."
 
 (defsubst mini-modeline--exit-minibuffer ()
   "`minibuffer-exit-hook' of mini-modeline."
-  (mapc
-   (lambda (buf)
-     (with-current-buffer buf
-       (when (and mini-modeline-enhance-visual
-                  (or (minibufferp buf)
-                      (string-prefix-p " *Echo Area" (buffer-name))))
-         (mini-modeline--set-buffer-face))))
-   (buffer-list))
+  (when mini-modeline-enhance-visual
+  (with-current-buffer mini-modeline--minibuffer
+    (mini-modeline--set-buffer-face)))
   (setq resize-mini-windows nil))
 
 (declare-function anzu--cons-mode-line "ext:anzu")
