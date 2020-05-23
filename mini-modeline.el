@@ -139,9 +139,11 @@ Set this to the minimal value that doesn't cause truncation."
 (defvar mini-modeline--command-state 'begin
   "The state of current executed command begin -> [exec exec-read] -> end.")
 
+(defvar-local mini-modeline--face-cookie nil)
 (defun mini-modeline--set-buffer-face ()
   "Set buffer default face for current buffer."
-  (face-remap-add-relative 'default mini-modeline-face-attr))
+  (setq mini-modeline--face-cookie
+        (face-remap-add-relative 'default mini-modeline-face-attr)))
 
 (defun mini-modeline--log (&rest args)
   "Log message into message buffer with ARGS as same parameters in `message'."
@@ -155,6 +157,7 @@ Set this to the minimal value that doesn't cause truncation."
   "Check if time already pass DURATION from SINCE."
   `(>= (float-time (time-since ,since)) ,duration))
 
+(defvar mini-modeline--minibuffer nil)
 (defun mini-modeline-display (&optional arg)
   "Update mini-modeline.
 When ARG is:
@@ -165,7 +168,9 @@ When ARG is:
         (cl-letf (((symbol-function 'completion-all-completions) #'ignore))
           (unless (or (active-minibuffer-window)
                       (input-pending-p))
-            (with-current-buffer (window-buffer (minibuffer-window mini-modeline-frame))
+            (setq mini-modeline--minibuffer
+                  (window-buffer (minibuffer-window mini-modeline-frame)))
+            (with-current-buffer mini-modeline--minibuffer
               (let ((truncate-lines mini-modeline-truncate-p)
                     (inhibit-read-only t)
                     (inhibit-redisplay t)
@@ -264,7 +269,8 @@ Return value is (STRING . LINES)."
 
 (defun mini-modeline--reroute-msg (func &rest args)
   "Reroute FUNC with ARGS that echo to echo area to place hodler."
-  (unless inhibit-message
+  (if inhibit-message
+      (apply func args)
     (let* ((inhibit-message t)
            (mini-modeline--msg-message (apply func args)))
       (mini-modeline-display 'force))))
@@ -302,7 +308,6 @@ BODY will be supplied with orig-func and args."
 (declare-function anzu--reset-mode-line "ext:anzu")
 
 (defvar mini-modeline--timer nil)
-(defvar-local mini-modeline--face-cookie nil)
 
 (defun mini-modeline--enable ()
   "Enable `mini-modeline'."
@@ -319,7 +324,7 @@ BODY will be supplied with orig-func and args."
        (when (and mini-modeline-enhance-visual
                   (or (minibufferp buf)
                       (string-prefix-p " *Echo Area" (buffer-name))))
-         (setq mini-modeline--face-cookie (mini-modeline--set-buffer-face)))
+         (mini-modeline--set-buffer-face))
        ;; Make the modeline in GUI a thin bar.
        (when (and (local-variable-p 'face-remapping-alist) (display-graphic-p))
          (setf (alist-get 'mode-line face-remapping-alist)
@@ -372,8 +377,7 @@ BODY will be supplied with orig-func and args."
    read-key-sequence-vector
    (progn
      (setq mini-modeline--command-state 'exec-read)
-     (apply orig-func args)))
-  )
+     (apply orig-func args))))
 
 (defun mini-modeline--disable ()
   "Disable `mini-modeline'."
