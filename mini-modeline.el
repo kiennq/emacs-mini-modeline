@@ -165,64 +165,66 @@ When ARG is:
 - `clear', clear the minibuffer.  This implies `force'."
   (save-match-data
     (condition-case err
-        (cl-letf (((symbol-function 'completion-all-completions) #'ignore))
-          (unless (or (active-minibuffer-window)
-                      (input-pending-p))
-            (setq mini-modeline--minibuffer
-                  (window-buffer (minibuffer-window mini-modeline-frame)))
-            (with-current-buffer mini-modeline--minibuffer
-              (let ((truncate-lines mini-modeline-truncate-p)
-                    (inhibit-read-only t)
-                    (inhibit-redisplay t)
-                    (buffer-undo-list t))
-                (when (or (memq arg '(force clear))
-                          (mini-modeline--overduep mini-modeline--last-update
-                                                   mini-modeline-update-interval))
-                  (when-let ((msg (or mini-modeline--msg-message (current-message))))
-                    ;; Clear echo area and start new timer for echo message
-                    ;; (mini-modeline--log "msg: %s\n" msg)
-                    ;; (mini-modeline--log "from: %s\n" mini-modeline--msg-message)
-                    (message nil)
-                    (setq mini-modeline--last-echoed (current-time))
-                    ;; we proritize the message from `message'
-                    ;; or the message when we're not in middle of a command running.
-                    (when (or mini-modeline--msg-message
-                              (eq mini-modeline--command-state 'begin))
-                      (setq mini-modeline--command-state 'exec)
-                      ;; Don't echo keystrokes when in middle of command
-                      (setq echo-keystrokes 0))
-                    (setq mini-modeline--msg msg))
-                  ;; Reset echo message when timeout and not in middle of command
-                  (when (and mini-modeline--msg
-                             (not (memq mini-modeline--command-state '(exec exec-read)))
-                             (mini-modeline--overduep mini-modeline--last-echoed
-                                                      mini-modeline-echo-duration))
-                    (setq mini-modeline--msg nil))
-                  ;; Showing mini-modeline
-                  (if (eq arg 'clear)
-                      (setq mini-modeline--cache nil)
-                    (setq mini-modeline--cache
-                          (mini-modeline--multi-lr-render
-                           (if mini-modeline--msg
-                               (format-mode-line '(:eval (mini-modeline-msg)))
-                             (format-mode-line mini-modeline-l-format))
-                           (format-mode-line mini-modeline-r-format)))
-                    (setq mini-modeline--last-update (current-time)))
+        (unless (or (active-minibuffer-window)
+                    (input-pending-p))
+          (setq mini-modeline--minibuffer
+                (window-buffer (minibuffer-window mini-modeline-frame)))
+          (with-current-buffer mini-modeline--minibuffer
+            (let ((truncate-lines mini-modeline-truncate-p)
+                  (inhibit-read-only t)
+                  (inhibit-redisplay t)
+                  (buffer-undo-list t)
+                  (inhibit-message t))
+              (when (or (memq arg '(force clear))
+                        (mini-modeline--overduep mini-modeline--last-update
+                                                 mini-modeline-update-interval))
+                (when-let ((msg (or mini-modeline--msg-message (current-message))))
+                  ;; Clear echo area and start new timer for echo message
+                  ;; (mini-modeline--log "msg: %s\n" msg)
+                  ;; (mini-modeline--log "from: %s\n" mini-modeline--msg-message)
+                  (message nil)
+                  (setq mini-modeline--last-echoed (current-time))
+                  ;; we proritize the message from `message'
+                  ;; or the message when we're not in middle of a command running.
+                  (when (or mini-modeline--msg-message
+                            (eq mini-modeline--command-state 'begin))
+                    (setq mini-modeline--command-state 'exec)
+                    ;; Don't echo keystrokes when in middle of command
+                    (setq echo-keystrokes 0))
+                  (setq mini-modeline--msg msg)
+                  (setq mini-modeline--msg-message nil))
+                ;; Reset echo message when timeout and not in middle of command
+                (when (and mini-modeline--msg
+                           (not (memq mini-modeline--command-state '(exec exec-read)))
+                           (mini-modeline--overduep mini-modeline--last-echoed
+                                                    mini-modeline-echo-duration))
+                  (setq mini-modeline--msg nil))
+                ;; ;; Showing mini-modeline
+                (if (eq arg 'clear)
+                    (setq mini-modeline--cache nil)
+                  (let ((msg (while-no-input
+                               (mini-modeline--multi-lr-render
+                                (if mini-modeline--msg
+                                    (format-mode-line '(:eval (mini-modeline-msg)))
+                                  (format-mode-line mini-modeline-l-format))
+                                (format-mode-line mini-modeline-r-format)))))
+                    (unless (booleanp msg) (setq mini-modeline--cache msg))
+                    (setq mini-modeline--last-update (current-time))))
 
-                  ;; write to minibuffer
-                  (erase-buffer)
-                  (when mini-modeline--cache
-                    (let ((height-delta (- (cdr mini-modeline--cache)
-                                              (window-height (minibuffer-window mini-modeline-frame))))
-                          ;; ; let mini-modeline take control of mini-buffer size
-                          (resize-mini-windows t))
-                      (when (or (> height-delta 0)
-                                ;; this is to prevent window flashing for consecutive multi-line message
-                                (mini-modeline--overduep mini-modeline--last-change-size
-                                                         mini-modeline-echo-duration))
-                        (window-resize (minibuffer-window mini-modeline-frame) height-delta)
-                        (setq mini-modeline--last-change-size (current-time)))
-                      (insert (car mini-modeline--cache)))))))))
+                ;; write to minibuffer
+                (erase-buffer)
+                (when mini-modeline--cache
+                  (let ((height-delta (- (cdr mini-modeline--cache)
+                                         (window-height (minibuffer-window mini-modeline-frame))))
+                        ;; ; let mini-modeline take control of mini-buffer size
+                        (resize-mini-windows t))
+                    (when (or (> height-delta 0)
+                              ;; this is to prevent window flashing for consecutive multi-line message
+                              (mini-modeline--overduep mini-modeline--last-change-size
+                                                       mini-modeline-echo-duration))
+                      (window-resize (minibuffer-window mini-modeline-frame) height-delta)
+                      (setq mini-modeline--last-change-size (current-time)))
+                    (insert (car mini-modeline--cache))))))))
       ((error debug)
        (mini-modeline--log "mini-modeline: %s\n" err)))))
 
@@ -272,8 +274,8 @@ Return value is (STRING . LINES)."
   (if inhibit-message
       (apply func args)
     (let* ((inhibit-message t)
-           (mini-modeline--msg-message (apply func args)))
-      (mini-modeline-display 'force))))
+           (msg (apply func args)))
+      (setq mini-modeline--msg-message msg))))
 
 (defmacro mini-modeline--wrap (func &rest body)
   "Add an advice around FUNC with name mini-modeline--%s.
