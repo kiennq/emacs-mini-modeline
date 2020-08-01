@@ -115,6 +115,11 @@ Nil means current selected frame."
   :type 'sexp
   :group 'mini-modeline)
 
+(defcustom mini-modeline-display-gui-line t
+  "Display thin line at the bottom of the window."
+  :type 'boolean
+  :group 'mini-modeline)
+
 (defcustom mini-modeline-right-padding 3
   "Padding to use in the right side.
 Set this to the minimal value that doesn't cause truncation."
@@ -213,7 +218,7 @@ When ARG is:
                   (erase-buffer)
                   (when mini-modeline--cache
                     (let ((height-delta (- (cdr mini-modeline--cache)
-                                              (window-height (minibuffer-window mini-modeline-frame))))
+                                           (window-height (minibuffer-window mini-modeline-frame))))
                           ;; ; let mini-modeline take control of mini-buffer size
                           (resize-mini-windows t))
                       (when (or (> height-delta 0)
@@ -316,20 +321,26 @@ BODY will be supplied with orig-func and args."
   "Enable `mini-modeline'."
   ;; Hide modeline for terminal, or use empty modeline for GUI.
   (setq-default mini-modeline--orig-mode-line mode-line-format)
-  (setq-default mode-line-format (when (display-graphic-p) '(" ")))
+  (setq-default mode-line-format (when (and mini-modeline-display-gui-line
+                                            (display-graphic-p))
+                                   '(" ")))
   ;; Do the same thing with opening buffers.
   (mapc
    (lambda (buf)
      (with-current-buffer buf
        (when (local-variable-p 'mode-line-format)
          (setq mini-modeline--orig-mode-line mode-line-format)
-         (setq mode-line-format (when (display-graphic-p) '(" "))))
+         (setq mode-line-format (when (and mini-modeline-display-gui-line
+                                           (display-graphic-p))
+                                  '(" "))))
        (when (and mini-modeline-enhance-visual
                   (or (minibufferp buf)
                       (string-prefix-p " *Echo Area" (buffer-name))))
          (mini-modeline--set-buffer-face))
        ;; Make the modeline in GUI a thin bar.
-       (when (and (local-variable-p 'face-remapping-alist) (display-graphic-p))
+       (when (and mini-modeline-display-gui-line
+                  (local-variable-p 'face-remapping-alist)
+                  (display-graphic-p))
          (setf (alist-get 'mode-line face-remapping-alist)
                'mini-modeline-mode-line
                (alist-get 'mode-line-inactive face-remapping-alist)
@@ -337,7 +348,8 @@ BODY will be supplied with orig-func and args."
    (buffer-list))
 
   ;; Make the modeline in GUI a thin bar.
-  (when (display-graphic-p)
+  (when (and mini-modeline-display-gui-line
+             (display-graphic-p))
     (let ((face-remaps (default-value 'face-remapping-alist)))
       (setf (alist-get 'mode-line face-remaps)
             'mini-modeline-mode-line
@@ -400,7 +412,8 @@ BODY will be supplied with orig-func and args."
          (setq mode-line-format mini-modeline--orig-mode-line))
        (when mini-modeline--face-cookie
          (face-remap-remove-relative mini-modeline--face-cookie))
-       (when (and (local-variable-p 'face-remapping-alist) (display-graphic-p))
+       (when (and (local-variable-p 'face-remapping-alist)
+                  (display-graphic-p))
          (setf (alist-get 'mode-line face-remapping-alist)
                mini-modeline--orig-mode-line-remap
                (alist-get 'mode-line-inactive face-remapping-alist)
@@ -425,8 +438,8 @@ BODY will be supplied with orig-func and args."
   (advice-remove #'anzu--reset-mode-line 'mini-modeline--anzu--reset-mode-line)
 
   (advice-remove #'read-key-sequence 'mini-modeline--read-key-sequence)
-  (advice-remove #'read-key-sequence-vector 'mini-modeline--read-key-sequence-vector)
-  )
+  (advice-remove #'read-key-sequence-vector 'mini-modeline--read-key-sequence-vector))
+
 
 ;;;###autoload
 (define-minor-mode mini-modeline-mode

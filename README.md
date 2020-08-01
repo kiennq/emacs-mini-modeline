@@ -73,6 +73,9 @@ You can customize those variable for better experiences.
 9. `mini-modeline-right-padding`
    Padding to use in the right side. Set this to the minimal value that doesn't cause truncation.
 
+10. `mini-modeline-display-gui-line`
+    Display thin line at the bottom of each window.
+
 # Why?
 
 Echo area or `minibuffer` which reside in it is a big waste most of the time.
