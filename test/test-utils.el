@@ -22,8 +22,8 @@
 ;;
 
 ;;; Code:
-(require 'bootstrap)
 (require 'ert)
+(load "bootstrap")
 
 (ert-deftest mimo-byte-compilation-test ()
   (seq-doseq (library (-filter

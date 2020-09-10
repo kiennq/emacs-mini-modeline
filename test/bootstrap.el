@@ -48,6 +48,3 @@
         deps)
   (add-hook 'kill-emacs-hook `(lambda ()
                                 (delete-directory ,user-emacs-directory t))))
-
-(provide 'bootstrap)
-;;; bootstrap.el ends here
