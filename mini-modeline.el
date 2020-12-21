@@ -278,7 +278,8 @@ Return value is (STRING . LINES)."
       (apply func args)
     (let* ((inhibit-message t)
            (mini-modeline--msg-message (apply func args)))
-      (mini-modeline-display 'force))))
+      (mini-modeline-display 'force)
+      mini-modeline--msg-message)))
 
 (defmacro mini-modeline--wrap (func &rest body)
   "Add an advice around FUNC with name mini-modeline--%s.
