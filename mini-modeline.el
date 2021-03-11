@@ -255,7 +255,7 @@ When ARG is:
           (cons
            (let ((available-width (+ available-width (string-width left))))
              (format (format "%%0.%ds\n%%s" available-width) right left))
-           1))
+           (ceiling (string-width left) (frame-width mini-modeline-frame))))
       (cons (format (format "%%s %%%ds" available-width) left right) 0))))
 
 (defun mini-modeline--multi-lr-render (left right)
