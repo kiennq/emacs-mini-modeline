@@ -179,7 +179,8 @@ When ARG is:
               (let ((truncate-lines mini-modeline-truncate-p)
                     (inhibit-read-only t)
                     (inhibit-redisplay t)
-                    (buffer-undo-list t))
+                    (buffer-undo-list t)
+                    modeline-content)
                 (when (or (memq arg '(force clear))
                           (mini-modeline--overduep mini-modeline--last-update
                                                    mini-modeline-update-interval))
@@ -205,8 +206,8 @@ When ARG is:
                     (setq mini-modeline--msg nil))
                   ;; Showing mini-modeline
                   (if (eq arg 'clear)
-                      (setq mini-modeline--cache nil)
-                    (setq mini-modeline--cache
+                      (setq modeline-content nil)
+                    (setq modeline-content
                           (mini-modeline--multi-lr-render
                            (if mini-modeline--msg
                                (format-mode-line '(:eval (mini-modeline-msg)))
@@ -215,19 +216,22 @@ When ARG is:
                     (setq mini-modeline--last-update (current-time)))
 
                   ;; write to minibuffer
-                  (erase-buffer)
-                  (when mini-modeline--cache
-                    (let ((height-delta (- (cdr mini-modeline--cache)
-                                           (window-height (minibuffer-window mini-modeline-frame))))
-                          ;; ; let mini-modeline take control of mini-buffer size
-                          (resize-mini-windows t))
-                      (when (or (> height-delta 0)
-                                ;; this is to prevent window flashing for consecutive multi-line message
-                                (mini-modeline--overduep mini-modeline--last-change-size
-                                                         mini-modeline-echo-duration))
-                        (window-resize (minibuffer-window mini-modeline-frame) height-delta)
-                        (setq mini-modeline--last-change-size (current-time)))
-                      (insert (car mini-modeline--cache)))))))))
+                  (unless (equal modeline-content
+                                 mini-modeline--cache)
+                    (setq mini-modeline--cache modeline-content)
+                    (erase-buffer)
+                    (when mini-modeline--cache
+                      (let ((height-delta (- (cdr mini-modeline--cache)
+                                             (window-height (minibuffer-window mini-modeline-frame))))
+                            ;; ; let mini-modeline take control of mini-buffer size
+                            (resize-mini-windows t))
+                        (when (or (> height-delta 0)
+                                  ;; this is to prevent window flashing for consecutive multi-line message
+                                  (mini-modeline--overduep mini-modeline--last-change-size
+                                                           mini-modeline-echo-duration))
+                          (window-resize (minibuffer-window mini-modeline-frame) height-delta)
+                          (setq mini-modeline--last-change-size (current-time)))
+                        (insert (car mini-modeline--cache))))))))))
       ((error debug)
        (mini-modeline--log "mini-modeline: %s\n" err)))))
 
