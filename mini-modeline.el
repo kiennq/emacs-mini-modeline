@@ -170,7 +170,9 @@ When ARG is:
 - `clear', clear the minibuffer.  This implies `force'."
   (save-match-data
     (condition-case err
-        (cl-letf (((symbol-function 'completion-all-completions) #'ignore))
+        (cl-letf (((symbol-function 'completion-all-completions) #'ignore)
+                  (l-fmt mini-modeline-l-format)
+                  (r-fmt mini-modeline-r-format))
           (unless (or (active-minibuffer-window)
                       (input-pending-p))
             (setq mini-modeline--minibuffer
@@ -211,8 +213,8 @@ When ARG is:
                           (mini-modeline--multi-lr-render
                            (if mini-modeline--msg
                                (format-mode-line '(:eval (mini-modeline-msg)))
-                             (format-mode-line mini-modeline-l-format))
-                           (format-mode-line mini-modeline-r-format)))
+                             (format-mode-line l-fmt))
+                           (format-mode-line r-fmt)))
                     (setq mini-modeline--last-update (current-time)))
 
                   ;; write to minibuffer
