@@ -429,7 +429,7 @@ BODY will be supplied with orig-func and args."
   (redisplay)
   ;; (remove-hook 'post-command-hook #'mini-modeline-display)
   ;; (remove-hook 'pre-redisplay-functions #'mini-modeline-display)
-  (when (timerp (cancel-timer mini-modeline--timer)))
+  (when (timerp mini-modeline--timer) (cancel-timer mini-modeline--timer))
   (mini-modeline-display 'clear)
   (advice-remove #'message #'mini-modeline--reroute-msg)
 
