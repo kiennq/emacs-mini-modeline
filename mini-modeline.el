@@ -81,7 +81,7 @@
   :type 'boolean
   :group 'mini-modeline)
 
-(defface mini-modeline-mode-line
+(defface mini-modeline-mode-line-active
   '((((background light))
      :background "#55ced1" :height 0.14 :box nil)
     (t
@@ -99,8 +99,8 @@
 
 (defvar-local mini-modeline--orig-mode-line mode-line-format)
 (defvar mini-modeline--echo-keystrokes echo-keystrokes)
-(defvar mini-modeline--orig-mode-line-remap
-  (or (alist-get 'mode-line face-remapping-alist) 'mode-line))
+(defvar mini-modeline--orig-mode-line-active-remap
+  (or (alist-get 'mode-line-active face-remapping-alist) 'mode-line-active))
 (defvar mini-modeline--orig-mode-line-inactive-remap
   (or (alist-get 'mode-line-inactive face-remapping-alist) 'mode-line-inactive))
 
@@ -348,8 +348,8 @@ BODY will be supplied with orig-func and args."
        (when (and mini-modeline-display-gui-line
                   (local-variable-p 'face-remapping-alist)
                   (display-graphic-p))
-         (setf (alist-get 'mode-line face-remapping-alist)
-               'mini-modeline-mode-line
+         (setf (alist-get 'mode-line-active face-remapping-alist)
+               'mini-modeline-mode-line-active
                (alist-get 'mode-line-inactive face-remapping-alist)
                'mini-modeline-mode-line-inactive))))
    (buffer-list))
@@ -358,8 +358,8 @@ BODY will be supplied with orig-func and args."
   (when (and mini-modeline-display-gui-line
              (display-graphic-p))
     (let ((face-remaps (default-value 'face-remapping-alist)))
-      (setf (alist-get 'mode-line face-remaps)
-            'mini-modeline-mode-line
+      (setf (alist-get 'mode-line-active face-remaps)
+            'mini-modeline-mode-line-active
             (alist-get 'mode-line-inactive face-remaps)
             'mini-modeline-mode-line-inactive
             (default-value 'face-remapping-alist) face-remaps)))
@@ -406,8 +406,8 @@ BODY will be supplied with orig-func and args."
   (setq-default mode-line-format (default-value 'mini-modeline--orig-mode-line))
   (when (display-graphic-p)
     (let ((face-remaps (default-value 'face-remapping-alist)))
-      (setf (alist-get 'mode-line face-remaps)
-            mini-modeline--orig-mode-line-remap
+      (setf (alist-get 'mode-line-active face-remaps)
+            mini-modeline--orig-mode-line-active-remap
             (alist-get 'mode-line-inactive face-remaps)
             mini-modeline--orig-mode-line-inactive-remap
             (default-value 'face-remapping-alist) face-remaps)))
@@ -421,8 +421,8 @@ BODY will be supplied with orig-func and args."
          (face-remap-remove-relative mini-modeline--face-cookie))
        (when (and (local-variable-p 'face-remapping-alist)
                   (display-graphic-p))
-         (setf (alist-get 'mode-line face-remapping-alist)
-               mini-modeline--orig-mode-line-remap
+         (setf (alist-get 'mode-line-active face-remapping-alist)
+               mini-modeline--orig-mode-line-active-remap
                (alist-get 'mode-line-inactive face-remapping-alist)
                mini-modeline--orig-mode-line-inactive-remap))))
    (buffer-list))
