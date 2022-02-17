@@ -100,9 +100,9 @@
 (defvar-local mini-modeline--orig-mode-line mode-line-format)
 (defvar mini-modeline--echo-keystrokes echo-keystrokes)
 (defvar mini-modeline--orig-mode-line-active-remap
-  (or (alist-get 'mode-line-active face-remapping-alist) 'mode-line-active))
+  (or (alist-get 'mode-line-active face-remapping-alist) '(mode-line-active)))
 (defvar mini-modeline--orig-mode-line-inactive-remap
-  (or (alist-get 'mode-line-inactive face-remapping-alist) 'mode-line-inactive))
+  (or (alist-get 'mode-line-inactive face-remapping-alist) '(mode-line-inactive)))
 
 (defcustom mini-modeline-echo-duration 2
   "Duration to keep display echo."
@@ -349,9 +349,9 @@ BODY will be supplied with orig-func and args."
                   (local-variable-p 'face-remapping-alist)
                   (display-graphic-p))
          (setf (alist-get 'mode-line-active face-remapping-alist)
-               'mini-modeline-mode-line-active
+               '(mini-modeline-mode-line-active)
                (alist-get 'mode-line-inactive face-remapping-alist)
-               'mini-modeline-mode-line-inactive))))
+               '(mini-modeline-mode-line-inactive)))))
    (buffer-list))
 
   ;; Make the modeline in GUI a thin bar.
@@ -359,9 +359,9 @@ BODY will be supplied with orig-func and args."
              (display-graphic-p))
     (let ((face-remaps (default-value 'face-remapping-alist)))
       (setf (alist-get 'mode-line-active face-remaps)
-            'mini-modeline-mode-line-active
+            '(mini-modeline-mode-line-active)
             (alist-get 'mode-line-inactive face-remaps)
-            'mini-modeline-mode-line-inactive
+            '(mini-modeline-mode-line-inactive)
             (default-value 'face-remapping-alist) face-remaps)))
 
   (setq mini-modeline--orig-resize-mini-windows resize-mini-windows)
