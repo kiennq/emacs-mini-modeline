@@ -126,6 +126,14 @@ Set this to the minimal value that doesn't cause truncation."
   :type 'integer
   :group 'mini-modeline)
 
+(defcustom mini-modeline-echo-position "left"
+  "Position to display echo area.
+Set this to 'left' 'middle' 'right'."
+  :type '(choice (const "left")
+		 (const "middle")
+		 (const "right"))
+  :group 'mini-modeline)
+
 (defvar mini-modeline--last-echoed nil)
 
 (defvar mini-modeline--msg nil)
@@ -209,12 +217,26 @@ When ARG is:
                   ;; Showing mini-modeline
                   (if (eq arg 'clear)
                       (setq modeline-content nil)
-                    (setq modeline-content
-                          (mini-modeline--multi-lr-render
-                           (if mini-modeline--msg
-                               (format-mode-line '(:eval (mini-modeline-msg)))
-                             (format-mode-line l-fmt))
-                           (format-mode-line r-fmt)))
+                    (setq modeline-content                        
+			  (pcase mini-modeline-echo-position
+			    ("left"
+			     (mini-modeline--multi-lr-render
+			      (if mini-modeline--msg
+				  (format-mode-line '(:eval (mini-modeline-msg)))
+				(format-mode-line l-fmt))
+                              (format-mode-line r-fmt)))
+			    ("middle"
+			     (mini-modeline--multi-lr-render
+			      (if mini-modeline--msg
+				  (format-mode-line (append l-fmt '((:eval (mini-modeline-msg)))))
+				(format-mode-line l-fmt))
+                              (format-mode-line r-fmt)))
+			    ("right"
+			     (mini-modeline--multi-lr-render
+			      (format-mode-line l-fmt)
+			      (if mini-modeline--msg
+				  (format-mode-line '(:eval (mini-modeline-msg)))
+				(format-mode-line r-fmt))))))
                     (setq mini-modeline--last-update (current-time)))
 
                   ;; write to minibuffer
