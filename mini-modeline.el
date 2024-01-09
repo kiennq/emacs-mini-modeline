@@ -223,43 +223,47 @@ When ARG is:
                   (if (eq arg 'clear)
                       (setq modeline-content nil)
                     (setq modeline-content                        
-			  (pcase mini-modeline-echo-position
-			    ("left"
-			     (mini-modeline--multi-lr-render
-			      (if mini-modeline--msg
-				  (format-mode-line '(:eval (mini-modeline-msg)))
-				(format-mode-line l-fmt))
+			              (pcase mini-modeline-echo-position
+			                ("left"
+			                 (mini-modeline--multi-lr-render
+			                  (if mini-modeline--msg
+				                  (format-mode-line '(:eval (mini-modeline-msg)))
+				                (format-mode-line l-fmt))
                               (format-mode-line r-fmt)))
-			    ("middle"
-			     (mini-modeline--multi-lr-render
-			      (if mini-modeline--msg
-				  (format-mode-line (append l-fmt '((:eval (mini-modeline-msg)))))
-				(format-mode-line l-fmt))
+			                ("middle"
+			                 (mini-modeline--multi-lr-render
+			                  (if mini-modeline--msg
+				                  (format-mode-line (append l-fmt '((:eval (mini-modeline-msg)))))
+				                (format-mode-line l-fmt))
                               (format-mode-line r-fmt)))
-			    ("right"
-			     (mini-modeline--multi-lr-render
-			      (format-mode-line l-fmt)
-			      (if mini-modeline--msg
-				  (format-mode-line '(:eval (mini-modeline-msg)))
-				(format-mode-line r-fmt))))))
+			                ("right"
+			                 (mini-modeline--multi-lr-render
+			                  (format-mode-line l-fmt)
+			                  (if mini-modeline--msg
+				                  (format-mode-line '(:eval (mini-modeline-msg)))
+				                (format-mode-line r-fmt))))))
                     (setq mini-modeline--last-update (current-time)))
 
                   ;; write to minibuffer
-                  (unless (equal modeline-content
-                                 mini-modeline--cache)
-                    (setq mini-modeline--cache modeline-content)
-                    (erase-buffer)
-                    (when mini-modeline--cache
-                      (let ((height-delta (- (cdr mini-modeline--cache)
-                                             (window-height (minibuffer-window mini-modeline-frame))))
-                            ;; ; let mini-modeline take control of mini-buffer size
-                            (resize-mini-windows t))
-                        (when (or (> height-delta 0)
-                                  ;; this is to prevent window flashing for consecutive multi-line message
-                                  (mini-modeline--overduep mini-modeline--last-change-size
-                                                           mini-modeline-echo-duration))
-                          (window-resize (minibuffer-window mini-modeline-frame) height-delta)
-                          (setq mini-modeline--last-change-size (current-time)))
+                  (when modeline-content
+                    (unless (equal modeline-content
+                                   mini-modeline--cache)
+                      (setq mini-modeline--cache modeline-content)
+                      (erase-buffer)
+                      ;; there might be other low level function that affect the echo area height
+                      ;; this timer is a workaround for minibuffer not resized correctly
+                      (run-at-time 0.05 nil
+                                   (lambda ()
+                                     (let ((height-delta (- (cdr mini-modeline--cache)
+                                                            (window-height (minibuffer-window mini-modeline-frame))))
+                                           ;; let mini-modeline take control of mini-buffer size
+                                           (resize-mini-windows 'grow-only))
+                                       (window-resize (minibuffer-window mini-modeline-frame) height-delta)
+                                       (setq mini-modeline--last-change-size (current-time)))))
+                      (if (mini-modeline--overduep mini-modeline--last-change-size
+                                                   mini-modeline-echo-duration)
+                          ;; prepend with a notice that some messages are missed
+                          (insert (concat "[msg missed]" (car mini-modeline--cache)))
                         (insert (car mini-modeline--cache))))))))))
       ((error debug)
        (mini-modeline--log "mini-modeline: %s\n" err)))))
@@ -273,7 +277,8 @@ When ARG is:
   "Render the LEFT and RIGHT part of mini-modeline."
   (let* ((left (or left ""))
          (right (or right ""))
-         (available-width (max (- (frame-width mini-modeline-frame)
+         (frame-width (frame-width mini-modeline-frame))
+         (available-width (max (- frame-width
                                   (string-width left)
                                   mini-modeline-right-padding)
                                0))
@@ -286,9 +291,8 @@ When ARG is:
              (format (format "%%s %%%d.%ds" available-width available-width) left right)
              0)
           (cons
-           (let ((available-width (+ available-width (string-width left))))
-             (format (format "%%0.%ds\n%%s" available-width) right left))
-           (ceiling (string-width left) (frame-width mini-modeline-frame))))
+           (format (format "%%%d.%ds\n%%s" (- frame-width 1) (- frame-width 1)) right left)
+           (ceiling (string-width left) frame-width)))
       (cons (format (format "%%s %%%ds" available-width) left right) 0))))
 
 (defun mini-modeline--multi-lr-render (left right)
@@ -344,7 +348,7 @@ BODY will be supplied with orig-func and args."
   (when mini-modeline-enhance-visual
     (with-current-buffer mini-modeline--minibuffer
       (mini-modeline--set-buffer-face)))
-  (setq resize-mini-windows nil))
+  (setq resize-mini-windows mini-modeline--orig-resize-mini-windows))
 
 (declare-function anzu--cons-mode-line "ext:anzu")
 (declare-function anzu--reset-mode-line "ext:anzu")
@@ -392,11 +396,10 @@ BODY will be supplied with orig-func and args."
               'mini-modeline-mode-line-inactive
               (default-value 'face-remapping-alist) face-remaps))))
 
-  (setq mini-modeline--orig-resize-mini-windows resize-mini-windows)
-  (setq resize-mini-windows nil)
+  (setq resize-mini-windows mini-modeline--orig-resize-mini-windows)
   (redisplay)
   ;; (add-hook 'pre-redisplay-functions #'mini-modeline-display)
-  (setq mini-modeline--timer (run-with-timer 0 0.1 #'mini-modeline-display))
+  (setq mini-modeline--timer (run-with-idle-timer 0.1 t #'mini-modeline-display))
   (advice-add #'message :around #'mini-modeline--reroute-msg)
 
   (add-hook 'minibuffer-setup-hook #'mini-modeline--enter-minibuffer)
