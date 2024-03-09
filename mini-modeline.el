@@ -134,15 +134,27 @@ Set this to the minimal value that doesn't cause truncation."
   (setq mini-modeline--face-cookie
         (face-remap-add-relative 'default mini-modeline--face-attr)))
 
-(defvar my-log-flag nil)
+(defvar message-log-flag nil)
 
-(defun my-log-flag-toggle ()
+(defun message-log (force &rest args)
+  "Log message into message buffer with ARGS as same parameters in `message'."
+  (when (or message-log-flag force)
+    (save-excursion
+      (with-current-buffer "*Messages*"
+        (let ((inhibit-read-only t)
+              (log-text (apply #'format args)))
+          (goto-char (point-max))
+          (insert log-text)
+          (insert "\n")
+          (notify "message:" log-text))))))
+
+(defun message-log-flag-toggle ()
   (interactive)
-  (setq my-log-flag (not my-log-flag)))
+  (setq message-log-flag (not message-log-flag)))
 
 (defun mini-modeline--log (force &rest args)
   "Log message into message buffer with ARGS as same parameters in `message'."
-  (when (or my-log-flag force)
+  (when (or message-log-flag force)
     (save-excursion
       (with-current-buffer "*Messages*"
         (let ((inhibit-read-only t)
@@ -201,7 +213,7 @@ Return value is (STRING . LINES)."
 
 (defvar mini-modeline--unprocessed-message '())
 
-(defun mini-modeline--display (&optional force)
+(defun mini-modeline--display (&optional force keep-msg)
   "Update mini-modeline."
   (save-match-data
     (condition-case err
@@ -219,13 +231,14 @@ Return value is (STRING . LINES)."
                     (setq mini-modeline-content (mini-modeline--multi-lr-render
                                                  (or mini-modeline-content-left (format-mode-line mini-modeline--l-format))
                                                  (format-mode-line mini-modeline--r-format)))
-
-                    (setq mini-modeline--unprocessed-message '())
+                    (unless keep-msg
+                      (setq mini-modeline--unprocessed-message '()))
                     (setq mini-modeline--last-update-time (current-time))
-                    (run-at-time 0.1 nil 'mini-modeline--set-minibuffer
-                                 mini-modeline-content
-                                 mini-modeline-window
-                                 mini-modeline-buffer)))))))
+                    (setq mini-modeline--timer
+                          (run-at-time 0.1 nil 'mini-modeline--set-minibuffer
+                                       mini-modeline-content
+                                       mini-modeline-window
+                                       mini-modeline-buffer))))))))
       ((error debug)
        (mini-modeline--log t "mini-modeline: %s\n" err)))))
 
@@ -260,7 +273,7 @@ Return value is (STRING . LINES)."
       (add-to-list 'mini-modeline--unprocessed-message mini-modeline--message t)
       (mini-modeline--log nil "Reroute message %s minibuffer active: %s input pending: %s"
                           msg (active-minibuffer-window) (input-pending-p))
-      (mini-modeline--display 'force))
+      (mini-modeline--display 'force t))
     msg))
 
 (defmacro mini-modeline--wrap (func &rest body)
@@ -276,13 +289,15 @@ BODY will be supplied with orig-func and args."
   "Pre command hook of mini-modeline."
   ;; Don't echo keystrokes when in middle of command
   (setq echo-keystrokes 0)
-  (mini-modeline--display)
   (setq mini-modeline--idle nil))
 
 (defsubst mini-modeline--post-cmd ()
   "Post command hook of mini-modeline."
-  (mini-modeline--display)
+  ;; (message-log t "post-cmd %s %s" (string-join mini-modeline--unprocessed-message "\n") (current-buffer))
   (setq mini-modeline--idle t)
+  (mini-modeline--display)
+  ;; (unless (active-minibuffer-window)
+  ;;   (mini-modeline--display))
   (setq echo-keystrokes mini-modeline--echo-keystrokes))
 
 (defvar mini-modeline--orig-resize-mini-windows resize-mini-windows)
@@ -294,7 +309,8 @@ BODY will be supplied with orig-func and args."
 
 (defsubst mini-modeline--exit-minibuffer ()
   "`minibuffer-exit-hook' of mini-modeline."
-  (setq resize-mini-windows mini-modeline--orig-resize-mini-windows))
+  (setq resize-mini-windows mini-modeline--orig-resize-mini-windows)
+  (mini-modeline--display))
 
 (declare-function anzu--cons-mode-line "ext:anzu")
 (declare-function anzu--reset-mode-line "ext:anzu")
@@ -342,7 +358,7 @@ BODY will be supplied with orig-func and args."
   (setq resize-mini-windows mini-modeline--orig-resize-mini-windows)
   (redisplay)
 
-  ;; (defvar mini-modeline--timer nil)
+  (defvar mini-modeline--timer nil)
   ;; (setq mini-modeline--timer (run-with-idle-timer 0.1 t #'mini-modeline--display))
 
   (setq message-original (symbol-function 'message))
