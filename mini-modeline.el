@@ -49,17 +49,17 @@
   :type `(repeat symbol)
   :group 'mini-modeline)
 
-(defcustom mini-modeline--r-format '("%e" mode-line-front-space
-                                     mode-line-buffer-identification
-                                     ;; function name in [mule-info] could be long
+(defcustom mini-modeline--r-format '("%e" mode-line-process
                                      mode-line-mule-info
                                      mode-line-client
-                                     mode-line-modified
                                      mode-line-remote
                                      mode-line-frame-identification
-                                     " " mode-line-position " "
-                                     (:eval (string-trim (format-mode-line mode-line-modes)))
-                                     mode-line-misc-info)
+                                     (:eval (propertize mode-line-buffer-identification 'face 'link))
+                                     ;; [function name] could be long
+                                     (which-func-mode which-func-format)
+                                     mode-line-position-column-line-format
+                                     mode-line-modified
+                                     (:eval (propertize (format-time-string "%H:%M") 'face 'bold)))
   "Right part of mini-modeline, same format with `mode-line-format'."
   :type `(repeat symbol)
   :group 'mini-modeline)
@@ -394,6 +394,7 @@ BODY will be supplied with orig-func and args."
 
   (setq message-original (symbol-function 'message))
   (advice-add #'message :around #'mini-modeline--reroute-msg)
+  (advice-add #'force-mode-line-update :after #'mini-modeline--display)
 
   (add-hook 'focus-in-hook 'mini-modeline--display)
   (add-hook 'minibuffer-setup-hook #'mini-modeline--enter-minibuffer)
@@ -460,6 +461,7 @@ BODY will be supplied with orig-func and args."
   ;; (funcall 'clear-minibuffer-message)
   (message nil)
   (advice-remove #'message #'mini-modeline--reroute-msg)
+  (advice-remove #'force-mode-line-update #'mini-modeline--display)
 
   (remove-hook 'focus-in-hook 'mini-modeline--display)
   (remove-hook 'minibuffer-setup-hook #'mini-modeline--enter-minibuffer)
@@ -487,6 +489,27 @@ BODY will be supplied with orig-func and args."
   (if mini-modeline-mode
       (mini-modeline--enable)
     (mini-modeline--disable)))
+
+;; Emacs bug: too many places that write to the echo area without using message
+(defun keyboard-quit ()
+  "Signal a `quit' condition.
+  During execution of Lisp code, this character causes a quit directly.
+  At top-level, as an editor command, this simply beeps."
+  (interactive)
+  ;; Avoid adding the region to the window selection.
+  (setq saved-region-selection nil)
+  (let (select-active-regions)
+    (deactivate-mark))
+  (if (fboundp 'kmacro-keyboard-quit)
+      (kmacro-keyboard-quit))
+  (when completion-in-region-mode
+    (completion-in-region-mode -1))
+  ;; Force the next redisplay cycle to remove the "Def" indicator from
+  ;; all the mode lines.
+  (if defining-kbd-macro
+      (force-mode-line-update t))
+  (setq defining-kbd-macro nil)
+  (message "Quit"))
 
 (provide 'mini-modeline)
 ;;; mini-modeline.el ends here
