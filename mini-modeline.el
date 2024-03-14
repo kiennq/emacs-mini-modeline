@@ -33,6 +33,7 @@
 (require 'frame)
 (require 'timer)
 (require 'face-remap)
+(require 'cl-lib)
 
 (eval-when-compile
   (require 'subr-x)
@@ -43,50 +44,42 @@
   :group 'minibuffer
   :prefix "mini-modeline-")
 
-;; Forward declaration for evil-mode-line-tag
-(defvar evil-mode-line-tag)
-
-(defcustom mini-modeline-l-format nil
+(defcustom mini-modeline--l-format nil
   "Left part of mini-modeline, same format with `mode-line-format'."
   :type `(repeat symbol)
   :group 'mini-modeline)
 
-(defcustom mini-modeline-r-format '("%e" mode-line-front-space
-                                    mode-line-mule-info
-                                    mode-line-client
-                                    mode-line-modified
-                                    mode-line-remote
-                                    mode-line-frame-identification
-                                    mode-line-buffer-identification
-                                    " " mode-line-position " "
-                                    evil-mode-line-tag
-                                    (:eval (string-trim (format-mode-line mode-line-modes)))
-                                    mode-line-misc-info)
+(defcustom mini-modeline--r-format '("%e" mode-line-process
+                                     mode-line-mule-info
+                                     mode-line-client
+                                     mode-line-remote
+                                     mode-line-frame-identification
+                                     (:eval (propertize mode-line-buffer-identification 'face 'link))
+                                     ;; [function name] could be long
+                                     (which-func-mode which-func-format)
+                                     mode-line-position-column-line-format
+                                     mode-line-modified
+                                     (:eval (propertize (format-time-string "%H:%M") 'face 'bold)))
   "Right part of mini-modeline, same format with `mode-line-format'."
   :type `(repeat symbol)
   :group 'mini-modeline)
 
-(defcustom mini-modeline-face-attr `(:background ,(face-attribute 'mode-line :background))
+(defcustom mini-modeline--face-attr `(:background ,(face-attribute 'mode-line :background))
   "Plist of face attribute/value pair for mini-modeline."
   :type '(plist)
   :group 'mini-modeline)
 
-(defcustom mini-modeline-truncate-p t
+(defcustom mini-modeline--truncate-p nil
   "Truncates mini-modeline or not."
   :type 'boolean
   :group 'mini-modeline)
 
-(defcustom mini-modeline-enhance-visual t
+(defcustom mini-modeline--enhance-visual t
   "Enhance minibuffer and window's visibility."
   :type 'boolean
   :group 'mini-modeline)
 
-(defcustom mini-modeline-hide-mode-line t
-  "Turn off the main modeline when `mini-modeline-mode' is active."
-  :type 'boolean
-  :group 'mini-modeline)
-
-(defface mini-modeline-mode-line
+(defface mini-modeline--mode-line
   '((((background light))
      :background "#55ced1" :height 0.14 :box nil)
     (t
@@ -94,7 +87,7 @@
   "Modeline face for active window."
   :group 'mini-modeline)
 
-(defface mini-modeline-mode-line-inactive
+(defface mini-modeline--mode-line-inactive
   '((((background light))
      :background "#dddddd" :height 0.1 :box nil)
     (t
@@ -109,41 +102,16 @@
 (defvar mini-modeline--orig-mode-line-inactive-remap
   (or (alist-get 'mode-line-inactive face-remapping-alist) 'mode-line-inactive))
 
-(defcustom mini-modeline-echo-duration 2
-  "Duration to keep display echo."
-  :type 'number
-  :group 'mini-modeline)
-
-(defcustom mini-modeline-frame nil
-  "Frame to display mini-modeline on.
-Nil means current selected frame."
-  :type 'sexp
-  :group 'mini-modeline)
-
-(defcustom mini-modeline-display-gui-line t
+(defcustom mini-modeline--display-gui-line t
   "Display thin line at the bottom of the window."
   :type 'boolean
   :group 'mini-modeline)
 
-(defcustom mini-modeline-right-padding 3
+(defcustom mini-modeline--right-padding 2
   "Padding to use in the right side.
 Set this to the minimal value that doesn't cause truncation."
   :type 'integer
   :group 'mini-modeline)
-
-(defcustom mini-modeline-echo-position "left"
-  "Position to display echo area.
-Set this to 'left' 'middle' 'right'."
-  :type '(choice (const "left")
-		 (const "middle")
-		 (const "right"))
-  :group 'mini-modeline)
-
-(defvar mini-modeline--last-echoed nil)
-
-(defvar mini-modeline--msg nil)
-(defvar mini-modeline--msg-message nil
-  "Store the string from `message'.")
 
 ;; perf
 (defcustom mini-modeline-update-interval 0.1
@@ -151,168 +119,195 @@ Set this to 'left' 'middle' 'right'."
   :type 'number
   :group 'mini-modeline)
 
-(defvar mini-modeline--last-update (current-time))
-(defvar mini-modeline--last-change-size (current-time))
-(defvar mini-modeline--cache nil)
-(defvar mini-modeline--command-state 'begin
-  "The state of current executed command begin -> [exec exec-read] -> end.")
+(defvar mini-modeline--last-update-time (current-time))
+(defvar mini-modeline--idle t
+  "The state of current executed command.")
 
 (defvar-local mini-modeline--face-cookie nil)
 (defun mini-modeline--set-buffer-face ()
   "Set buffer default face for current buffer."
   (setq mini-modeline--face-cookie
-        (face-remap-add-relative 'default mini-modeline-face-attr)))
+        (face-remap-add-relative 'default mini-modeline--face-attr)))
 
-(defun mini-modeline--log (&rest args)
+(defvar message-log-flag nil)
+
+(defun message-log (force &rest args)
   "Log message into message buffer with ARGS as same parameters in `message'."
-  (save-excursion
-    (with-current-buffer "*Messages*"
-      (let ((inhibit-read-only t))
-        (goto-char (point-max))
-        (insert (apply #'format args))))))
+  (when (or message-log-flag force)
+    (save-excursion
+      (with-current-buffer "*Messages*"
+        (let ((inhibit-read-only t)
+              (log-text (apply #'format args)))
+          (goto-char (point-max))
+          (insert log-text)
+          (insert "\n")
+          (notify "message:" log-text))))))
+
+(defun message-log-flag-toggle ()
+  (interactive)
+  (setq message-log-flag (not message-log-flag)))
+
+(defun message-log (force &rest args)
+  "Log message into message buffer with ARGS as same parameters in `message'."
+  (when (or message-log-flag force)
+    (save-excursion
+      (with-current-buffer "*Messages*"
+        (let ((inhibit-read-only t)
+              (log-text (apply #'format args)))
+          (goto-char (point-max))
+          (insert log-text)
+          (insert "\n"))))))
+
+(defun mini-modeline--show-buffers ()
+  (interactive)
+  (split-window-vertically)
+  (switch-to-buffer " *Minibuf-0*")
+  (call-interactively 'split-window-vertically)
+  (call-interactively 'other-window)
+  (switch-to-buffer " *Echo Area 0*")
+  (call-interactively 'other-window))
 
 (defsubst mini-modeline--overduep (since duration)
   "Check if time already pass DURATION from SINCE."
   (>= (float-time (time-since since)) duration))
 
-(defvar mini-modeline--minibuffer nil)
-(defun mini-modeline-display (&optional arg)
-  "Update mini-modeline.
-When ARG is:
-- `force', force update the minibuffer.
-- `clear', clear the minibuffer.  This implies `force'."
-  (save-match-data
-    (condition-case err
-        (cl-letf (((symbol-function 'completion-all-completions) #'ignore)
-                  (l-fmt mini-modeline-l-format)
-                  (r-fmt mini-modeline-r-format))
-          (unless (or (active-minibuffer-window)
-                      (input-pending-p))
-            (setq mini-modeline--minibuffer
-                  (window-buffer (minibuffer-window mini-modeline-frame)))
-            (with-current-buffer mini-modeline--minibuffer
-              (let ((truncate-lines mini-modeline-truncate-p)
-                    (inhibit-read-only t)
-                    (inhibit-redisplay t)
-                    (buffer-undo-list t)
-                    modeline-content)
-                (when (or (memq arg '(force clear))
-                          (mini-modeline--overduep mini-modeline--last-update
-                                                   mini-modeline-update-interval))
-                  (when-let ((msg (or mini-modeline--msg-message (current-message))))
-                    ;; Clear echo area and start new timer for echo message
-                    ;; (mini-modeline--log "msg: %s\n" msg)
-                    ;; (mini-modeline--log "from: %s\n" mini-modeline--msg-message)
-                    (message nil)
-                    (setq mini-modeline--last-echoed (current-time))
-                    ;; we proritize the message from `message'
-                    ;; or the message when we're not in middle of a command running.
-                    (when (or mini-modeline--msg-message
-                              (eq mini-modeline--command-state 'begin))
-                      (setq mini-modeline--command-state 'exec)
-                      ;; Don't echo keystrokes when in middle of command
-                      (setq echo-keystrokes 0))
-                    (setq mini-modeline--msg msg))
-                  ;; Reset echo message when timeout and not in middle of command
-                  (when (and mini-modeline--msg
-                             (not (memq mini-modeline--command-state '(exec exec-read)))
-                             (mini-modeline--overduep mini-modeline--last-echoed
-                                                      mini-modeline-echo-duration))
-                    (setq mini-modeline--msg nil))
-                  ;; Showing mini-modeline
-                  (if (eq arg 'clear)
-                      (setq modeline-content nil)
-                    (setq modeline-content                        
-			  (pcase mini-modeline-echo-position
-			    ("left"
-			     (mini-modeline--multi-lr-render
-			      (if mini-modeline--msg
-				  (format-mode-line '(:eval (mini-modeline-msg)))
-				(format-mode-line l-fmt))
-                              (format-mode-line r-fmt)))
-			    ("middle"
-			     (mini-modeline--multi-lr-render
-			      (if mini-modeline--msg
-				  (format-mode-line (append l-fmt '((:eval (mini-modeline-msg)))))
-				(format-mode-line l-fmt))
-                              (format-mode-line r-fmt)))
-			    ("right"
-			     (mini-modeline--multi-lr-render
-			      (format-mode-line l-fmt)
-			      (if mini-modeline--msg
-				  (format-mode-line '(:eval (mini-modeline-msg)))
-				(format-mode-line r-fmt))))))
-                    (setq mini-modeline--last-update (current-time)))
-
-                  ;; write to minibuffer
-                  (unless (equal modeline-content
-                                 mini-modeline--cache)
-                    (setq mini-modeline--cache modeline-content)
-                    (erase-buffer)
-                    (when mini-modeline--cache
-                      (let ((height-delta (- (cdr mini-modeline--cache)
-                                             (window-height (minibuffer-window mini-modeline-frame))))
-                            ;; ; let mini-modeline take control of mini-buffer size
-                            (resize-mini-windows t))
-                        (when (or (> height-delta 0)
-                                  ;; this is to prevent window flashing for consecutive multi-line message
-                                  (mini-modeline--overduep mini-modeline--last-change-size
-                                                           mini-modeline-echo-duration))
-                          (window-resize (minibuffer-window mini-modeline-frame) height-delta)
-                          (setq mini-modeline--last-change-size (current-time)))
-                        (insert (car mini-modeline--cache))))))))))
-      ((error debug)
-       (mini-modeline--log "mini-modeline: %s\n" err)))))
-
-(defun mini-modeline-msg ()
-  "Place holder to display echo area message."
-  (when mini-modeline--msg
-    (replace-regexp-in-string "%" "%%" mini-modeline--msg)))
-
 (defsubst mini-modeline--lr-render (left right)
-  "Render the LEFT and RIGHT part of mini-modeline."
-  (let* ((left (or left ""))
-         (right (or right ""))
-         (available-width (max (- (frame-width mini-modeline-frame)
-                                  (string-width left)
-                                  mini-modeline-right-padding)
-                               0))
-         (required-width (string-width right)))
-    ;; (mini-modeline--log "a:%s r:%s\n" available-width required-width)
-    (if (< available-width required-width)
-        (if mini-modeline-truncate-p
+    "Render the LEFT and RIGHT part of mini-modeline."
+    (let* ((left (or left ""))
+           (right (or right ""))
+           (frame-width (frame-width nil))
+           (available-width (max (- frame-width
+                                    (string-width left)
+                                    mini-modeline--right-padding)
+                                 0))
+           (required-width (string-width right)))
+      (when (> (string-width right) frame-width)
+        (setq right (concat "[" (nth 1 (split-string right "\\[")))))
+      (when (> (string-width right) frame-width)
+        (setq right (nth 1 (split-string right "\\]"))))
+      (if (< available-width required-width)
+          (if mini-modeline--truncate-p
+              (cons (format (format "%%s %%%d.%ds" available-width available-width) left right)
+                    0)
             (cons
-             ;; Emacs 25 cannot use position format
-             (format (format "%%s %%%d.%ds" available-width available-width) left right)
-             0)
-          (cons
-           (let ((available-width (+ available-width (string-width left))))
-             (format (format "%%0.%ds\n%%s" available-width) right left))
-           (ceiling (string-width left) (frame-width mini-modeline-frame))))
-      (cons (format (format "%%s %%%ds" available-width) left right) 0))))
+             (format (format "%%%d.%ds\n%%s" (- frame-width 1) (- frame-width 1)) right left)
+             (ceiling (string-width left) frame-width)))
+        (cons (format (format "%%s %%%ds" available-width) left right) 0))))
 
 (defun mini-modeline--multi-lr-render (left right)
   "Render the LEFT and RIGHT part of mini-modeline with multiline supported.
 Return value is (STRING . LINES)."
-  (let* ((l (split-string left "\n"))
-         (r (split-string right "\n"))
-         (lines (max (length l) (length r)))
+  (let* ((l (nreverse (split-string left "\n")))
+         ;; right is a single line
+         ;; (lines (max (length l) (length r)))
+         (lines (length l))
+         ;; right part is on an separate bottom line
+         (result-lines 0)
          (extra-lines 0)
          re)
-    (--dotimes lines
-      (let ((lr (mini-modeline--lr-render (elt l it) (elt r it))))
+    (if (> lines 1)
+        (let* ((root (frame-root-window nil))
+               (max-lines (- (window-height root)
+                             (window-min-size root)
+                             1)))
+          ;; (--dotimes lines
+          ;;   (let ((lr (mini-modeline--lr-render (elt l it) (elt r it))))
+          ;;     (setq re (nconc re `(,(car lr))))
+          ;;     (setq extra-lines (+ extra-lines (cdr lr)))))
+          (dolist (i l)
+            (let ((first-i (equal 0 result-lines))
+                  lr)
+              (if first-i
+                  (setq lr (mini-modeline--lr-render i right))
+                (setq lr (mini-modeline--lr-render i "")))
+              ;; lines before max-lines counted backwards are removed to fit the mini-window
+              (if (> (+ result-lines 1 (cdr lr)) max-lines)
+                  (cl-return re)
+                (setq result-lines (+ result-lines 1 (cdr lr)))
+                (setq re (nconc re
+                                (if (and first-i (> (cdr lr) 0))
+                                    (nreverse `(,(car lr)))
+                                  `(,(car lr))))))))
+          (setq re (nreverse re)))
+      (let ((lr (mini-modeline--lr-render left right)))
         (setq re (nconc re `(,(car lr))))
-        (setq extra-lines (+ extra-lines (cdr lr)))))
-    (cons (string-join re "\n") (+ lines extra-lines))))
+        (setq result-lines (+ 1 (cdr lr)))))
+    (cons (string-join re "\n") result-lines)))
+
+(defvar mini-modeline--unprocessed-message '())
+
+(defun mini-modeline--display (&optional force keep-msg)
+  "Update mini-modeline."
+  (when (and (or mini-modeline--idle force)
+             (not (or (active-minibuffer-window)
+                      (input-pending-p))))
+    (save-match-data
+      (condition-case err
+          (cl-letf (((symbol-function 'completion-all-completions) #'ignore))
+            (let* ((mini-modeline-window (minibuffer-window nil))
+                   (mini-modeline-buffer (window-buffer mini-modeline-window)))
+              (with-current-buffer mini-modeline-buffer
+                (let (mini-modeline-content-left
+                      mini-modeline-content)
+                  ;; (message-log nil "mini-modeline--display, command state %s" mini-modeline--idle)
+                  (setq mini-modeline-content-left (string-join mini-modeline--unprocessed-message "\n"))
+                  (setq mini-modeline-content (mini-modeline--multi-lr-render
+                                               (or mini-modeline-content-left (format-mode-line mini-modeline--l-format))
+                                               (format-mode-line mini-modeline--r-format)))
+                  (unless keep-msg
+                    (setq mini-modeline--unprocessed-message '()))
+                  (setq mini-modeline--last-update-time (current-time))
+                  (setq mini-modeline--timer
+                        (run-at-time 0.1 nil 'mini-modeline--set-minibuffer
+                                     mini-modeline-content
+                                     mini-modeline-window
+                                     mini-modeline-buffer))))))
+        ((error debug)
+         (message-log t "mini-modeline: %s\n" err))))))
+
+(defun mini-modeline--set-minibuffer (mini-modeline-content
+                                      mini-modeline-window
+                                      mini-modeline-buffer)
+  (let* ((mini-modeline-content-height (cdr mini-modeline-content))
+         (height-delta (- mini-modeline-content-height
+                          (window-height mini-modeline-window)))
+         ;; (height-delta-diff (- height-delta (window-max-delta mini-modeline-window)))
+         (truncate-lines mini-modeline--truncate-p)
+         (buffer-undo-list t)
+         (inhibit-redisplay t)
+         (inhibit-read-only t)
+         ;; (auto-window-vscroll t)
+         ;; (redisplay-adhoc-scroll-in-resize-mini-windows t)
+         ;; (window-point-insertion-type t)
+         ;; (max-mini-window-height 0.5)
+         (cursor-in-echo-area t)
+         (resize-mini-windows t))
+    (with-current-buffer mini-modeline-buffer
+      (erase-buffer)
+      (insert (car mini-modeline-content))
+      ;; (message-log nil "mini-modeline--set-minibuffer minibuffer height: %s, delta: %s"
+      ;;                     (window-height mini-modeline-window) height-delta)
+      ;; (when (> height-delta-diff 0)
+      ;;   ;; (> mini-modeline-content-height (window-height mini-modeline-window)
+      ;;   (delete-region (point-min) (progn (forward-line height-delta-diff) (point))))
+      (when (> height-delta 0)
+        ;; (window--resize-mini-window mini-modeline-window height-delta)
+        (window-resize mini-modeline-window height-delta)))))
+
+(setq inhibit-read-only t)
 
 (defun mini-modeline--reroute-msg (func &rest args)
   "Reroute FUNC with ARGS that echo to echo area to place hodler."
-  (if inhibit-message
-      (apply func args)
-    (let* ((inhibit-message t)
-           (mini-modeline--msg-message (apply func args)))
-      (mini-modeline-display 'force)
-      mini-modeline--msg-message)))
+  (let* ((inhibit-message t)
+         (msg (apply func args)))
+    ;; (replace-regexp-in-string "%" "%%" (substring msg 0 max-message-length))
+    (unless (string-empty-p msg)
+      ;; todo delete trailing spaces and blank lines
+      (add-to-list 'mini-modeline--unprocessed-message msg t)
+      ;; (message-log nil "Reroute message %s minibuffer active: %s input pending: %s"
+      ;;              msg (active-minibuffer-window) (input-pending-p))
+      (mini-modeline--display 'force t))
+    msg))
 
 (defmacro mini-modeline--wrap (func &rest body)
   "Add an advice around FUNC with name mini-modeline--%s.
@@ -325,82 +320,87 @@ BODY will be supplied with orig-func and args."
 
 (defsubst mini-modeline--pre-cmd ()
   "Pre command hook of mini-modeline."
-  (setq mini-modeline--command-state 'begin))
+  ;; Don't echo keystrokes when in middle of command
+  (setq echo-keystrokes 0)
+  (setq mini-modeline--idle nil))
 
 (defsubst mini-modeline--post-cmd ()
   "Post command hook of mini-modeline."
-  (setq mini-modeline--command-state 'end
-        echo-keystrokes mini-modeline--echo-keystrokes))
+  ;; (message-log t "post-cmd %s %s" (string-join mini-modeline--unprocessed-message "\n") (current-buffer))
+  (setq mini-modeline--idle t)
+  (mini-modeline--display)
+  (setq echo-keystrokes mini-modeline--echo-keystrokes))
 
 (defvar mini-modeline--orig-resize-mini-windows resize-mini-windows)
 (defsubst mini-modeline--enter-minibuffer ()
   "`minibuffer-setup-hook' of mini-modeline."
-  (when mini-modeline-enhance-visual
+  (when mini-modeline--enhance-visual
     (mini-modeline--set-buffer-face))
   (setq resize-mini-windows 'grow-only))
 
 (defsubst mini-modeline--exit-minibuffer ()
   "`minibuffer-exit-hook' of mini-modeline."
-  (when mini-modeline-enhance-visual
-    (with-current-buffer mini-modeline--minibuffer
-      (mini-modeline--set-buffer-face)))
-  (setq resize-mini-windows nil))
+  (setq resize-mini-windows mini-modeline--orig-resize-mini-windows)
+  (mini-modeline--display))
 
 (declare-function anzu--cons-mode-line "ext:anzu")
 (declare-function anzu--reset-mode-line "ext:anzu")
 
-(defvar mini-modeline--timer nil)
-
 (defun mini-modeline--enable ()
   "Enable `mini-modeline'."
-  (when mini-modeline-hide-mode-line
-    ;; Hide modeline for terminal, or use empty modeline for GUI.
-    (setq-default mini-modeline--orig-mode-line mode-line-format)
-    (setq-default mode-line-format (when (and mini-modeline-display-gui-line
-                                              (display-graphic-p))
-                                     '(" ")))
-    ;; Do the same thing with opening buffers.
-    (mapc
-     (lambda (buf)
-       (with-current-buffer buf
-         (when (local-variable-p 'mode-line-format)
-           (setq mini-modeline--orig-mode-line mode-line-format)
-           (setq mode-line-format (when (and mini-modeline-display-gui-line
-                                             (display-graphic-p))
-                                    '(" "))))
-         (when (and mini-modeline-enhance-visual
-                    (or (minibufferp buf)
-                        (string-prefix-p " *Echo Area" (buffer-name))))
-           (mini-modeline--set-buffer-face))
-         ;; Make the modeline in GUI a thin bar.
-         (when (and mini-modeline-display-gui-line
-                    (local-variable-p 'face-remapping-alist)
-                    (display-graphic-p))
-           (setf (alist-get 'mode-line face-remapping-alist)
-                 'mini-modeline-mode-line
-                 (alist-get 'mode-line-inactive face-remapping-alist)
-                 'mini-modeline-mode-line-inactive))))
-     (buffer-list))
+  ;; Hide modeline for terminal, or use empty modeline for GUI.
+  (setq-default mini-modeline--orig-mode-line mode-line-format)
+  (setq-default mode-line-format (when (and mini-modeline--display-gui-line
+                                            (display-graphic-p))
+                                   '(" ")))
+  ;; Do the same thing with opening buffers.
+  (mapc
+   (lambda (buf)
+     (with-current-buffer buf
+       (when (local-variable-p 'mode-line-format)
+         (setq mini-modeline--orig-mode-line mode-line-format)
+         (setq mode-line-format (when (and mini-modeline--display-gui-line
+                                           (display-graphic-p))
+                                  '(" "))))
+       (when (and mini-modeline--enhance-visual
+                  (or (minibufferp buf)
+                      (string-prefix-p " *Echo Area" (buffer-name))))
+         (mini-modeline--set-buffer-face))
+       ;; Make the modeline in GUI a thin bar.
+       (when (and mini-modeline--display-gui-line
+                  (local-variable-p 'face-remapping-alist)
+                  (display-graphic-p))
+         (setf (alist-get 'mode-line face-remapping-alist)
+               'mini-modeline--mode-line
+               (alist-get 'mode-line-inactive face-remapping-alist)
+               'mini-modeline--mode-line-inactive))))
+   (buffer-list))
 
-    ;; Make the modeline in GUI a thin bar.
-    (when (and mini-modeline-display-gui-line
-               (display-graphic-p))
-      (let ((face-remaps (default-value 'face-remapping-alist)))
-        (setf (alist-get 'mode-line face-remaps)
-              'mini-modeline-mode-line
-              (alist-get 'mode-line-inactive face-remaps)
-              'mini-modeline-mode-line-inactive
-              (default-value 'face-remapping-alist) face-remaps))))
+  ;; Make the modeline in GUI a thin bar.
+  (when (and mini-modeline--display-gui-line
+             (display-graphic-p))
+    (let ((face-remaps (default-value 'face-remapping-alist)))
+      (setf (alist-get 'mode-line face-remaps)
+            'mini-modeline--mode-line
+            (alist-get 'mode-line-inactive face-remaps)
+            'mini-modeline--mode-line-inactive
+            (default-value 'face-remapping-alist) face-remaps)))
 
-  (setq mini-modeline--orig-resize-mini-windows resize-mini-windows)
-  (setq resize-mini-windows nil)
+  (setq resize-mini-windows mini-modeline--orig-resize-mini-windows)
   (redisplay)
-  ;; (add-hook 'pre-redisplay-functions #'mini-modeline-display)
-  (setq mini-modeline--timer (run-with-timer 0 0.1 #'mini-modeline-display))
-  (advice-add #'message :around #'mini-modeline--reroute-msg)
 
+  (defvar mini-modeline--timer nil)
+  ;; (setq mini-modeline--timer (run-with-idle-timer 0.1 t #'mini-modeline--display))
+
+  (setq message-original (symbol-function 'message))
+  (advice-add #'message :around #'mini-modeline--reroute-msg)
+  (advice-add #'force-mode-line-update :after #'mini-modeline--display)
+
+  (add-hook 'focus-in-hook 'mini-modeline--display)
   (add-hook 'minibuffer-setup-hook #'mini-modeline--enter-minibuffer)
   (add-hook 'minibuffer-exit-hook #'mini-modeline--exit-minibuffer)
+  (add-hook 'echo-area-clear-hook #'mini-modeline--exit-minibuffer)
+  ;; (add-hook 'pre-redisplay-functions #'mini-modeline--display)
   (add-hook 'pre-command-hook #'mini-modeline--pre-cmd)
   (add-hook 'post-command-hook #'mini-modeline--post-cmd)
 
@@ -408,64 +408,66 @@ BODY will be supplied with orig-func and args."
   ;; anzu
   (mini-modeline--wrap
    anzu--cons-mode-line
-   (let ((mode-line-format mini-modeline-r-format))
+   (let ((mode-line-format mini-modeline--r-format))
      (apply orig-func args)
-     (setq mini-modeline-r-format mode-line-format)))
+     (setq mini-modeline--r-format mode-line-format)))
   (mini-modeline--wrap
    anzu--reset-mode-line
-   (let ((mode-line-format mini-modeline-r-format))
+   (let ((mode-line-format mini-modeline--r-format))
      (apply orig-func args)
-     (setq mini-modeline-r-format mode-line-format)))
+     (setq mini-modeline--r-format mode-line-format)))
 
   ;; read-key-sequence
   (mini-modeline--wrap
    read-key-sequence
    (progn
-     (setq mini-modeline--command-state 'exec-read)
+     (setq mini-modeline--idle nil)
      (apply orig-func args)))
   (mini-modeline--wrap
    read-key-sequence-vector
    (progn
-     (setq mini-modeline--command-state 'exec-read)
+     (setq mini-modeline--idle nil)
      (apply orig-func args))))
 
 (defun mini-modeline--disable ()
   "Disable `mini-modeline'."
-  (when mini-modeline-hide-mode-line
-    (setq-default mode-line-format (default-value 'mini-modeline--orig-mode-line))
-    (when (display-graphic-p)
-      (let ((face-remaps (default-value 'face-remapping-alist)))
-        (setf (alist-get 'mode-line face-remaps)
-              mini-modeline--orig-mode-line-remap
-              (alist-get 'mode-line-inactive face-remaps)
-              mini-modeline--orig-mode-line-inactive-remap
-              (default-value 'face-remapping-alist) face-remaps)))
+  (setq-default mode-line-format (default-value 'mini-modeline--orig-mode-line))
+  (when (display-graphic-p)
+    (let ((face-remaps (default-value 'face-remapping-alist)))
+      (setf (alist-get 'mode-line face-remaps)
+            mini-modeline--orig-mode-line-remap
+            (alist-get 'mode-line-inactive face-remaps)
+            mini-modeline--orig-mode-line-inactive-remap
+            (default-value 'face-remapping-alist) face-remaps)))
 
-    (mapc
-     (lambda (buf)
-       (with-current-buffer buf
-         (when (local-variable-p 'mode-line-format)
-           (setq mode-line-format mini-modeline--orig-mode-line))
-         (when mini-modeline--face-cookie
-           (face-remap-remove-relative mini-modeline--face-cookie))
-         (when (and (local-variable-p 'face-remapping-alist)
-                    (display-graphic-p))
-           (setf (alist-get 'mode-line face-remapping-alist)
-                 mini-modeline--orig-mode-line-remap
-                 (alist-get 'mode-line-inactive face-remapping-alist)
-                 mini-modeline--orig-mode-line-inactive-remap))))
-     (buffer-list)))
+  (mapc
+   (lambda (buf)
+     (with-current-buffer buf
+       (when (local-variable-p 'mode-line-format)
+         (setq mode-line-format mini-modeline--orig-mode-line))
+       (when mini-modeline--face-cookie
+         (face-remap-remove-relative mini-modeline--face-cookie))
+       (when (and (local-variable-p 'face-remapping-alist)
+                  (display-graphic-p))
+         (setf (alist-get 'mode-line face-remapping-alist)
+               mini-modeline--orig-mode-line-remap
+               (alist-get 'mode-line-inactive face-remapping-alist)
+               mini-modeline--orig-mode-line-inactive-remap))))
+   (buffer-list))
 
   (setq resize-mini-windows mini-modeline--orig-resize-mini-windows)
   (redisplay)
-  ;; (remove-hook 'post-command-hook #'mini-modeline-display)
-  ;; (remove-hook 'pre-redisplay-functions #'mini-modeline-display)
-  (when (timerp mini-modeline--timer) (cancel-timer mini-modeline--timer))
-  (mini-modeline-display 'clear)
+  ;; (when (timerp mini-modeline--timer) (cancel-timer mini-modeline--timer))
+  ;; (funcall 'clear-minibuffer-message)
+  (message nil)
   (advice-remove #'message #'mini-modeline--reroute-msg)
+  (advice-remove #'force-mode-line-update #'mini-modeline--display)
 
+  (remove-hook 'focus-in-hook 'mini-modeline--display)
   (remove-hook 'minibuffer-setup-hook #'mini-modeline--enter-minibuffer)
   (remove-hook 'minibuffer-exit-hook #'mini-modeline--exit-minibuffer)
+  (remove-hook 'echo-area-clear-hook #'mini-modeline--exit-minibuffer)
+  ;; (remove-hook 'pre-redisplay-functions #'mini-modeline--display)
   (remove-hook 'pre-command-hook #'mini-modeline--pre-cmd)
   (remove-hook 'post-command-hook #'mini-modeline--post-cmd)
 
@@ -487,6 +489,27 @@ BODY will be supplied with orig-func and args."
   (if mini-modeline-mode
       (mini-modeline--enable)
     (mini-modeline--disable)))
+
+;; Emacs bug: too many places that write to the echo area without using message
+(defun keyboard-quit ()
+  "Signal a `quit' condition.
+  During execution of Lisp code, this character causes a quit directly.
+  At top-level, as an editor command, this simply beeps."
+  (interactive)
+  ;; Avoid adding the region to the window selection.
+  (setq saved-region-selection nil)
+  (let (select-active-regions)
+    (deactivate-mark))
+  (if (fboundp 'kmacro-keyboard-quit)
+      (kmacro-keyboard-quit))
+  (when completion-in-region-mode
+    (completion-in-region-mode -1))
+  ;; Force the next redisplay cycle to remove the "Def" indicator from
+  ;; all the mode lines.
+  (if defining-kbd-macro
+      (force-mode-line-update t))
+  (setq defining-kbd-macro nil)
+  (message "Quit"))
 
 (provide 'mini-modeline)
 ;;; mini-modeline.el ends here
